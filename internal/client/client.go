@@ -1,4 +1,4 @@
-package masthead
+package client
 
 import (
 	"fmt"

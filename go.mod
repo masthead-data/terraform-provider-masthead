@@ -1,4 +1,4 @@
-module terraform-provider-masthead-data
+module github.com/masthead-data/terraform-provider-masthead
 
 go 1.23.7
 

@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 	"os"
-	"github.com/masthead-data/masthead-client-go"
+	"github.com/masthead-data/terraform-provider-masthead/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -143,7 +143,7 @@ func (p *mastheadProvider) Configure(ctx context.Context, req provider.Configure
     }
 
     // Create a new Masthead client using the configuration values
-    client, err := masthead.NewClient(host, token)
+    client, err := masthead.NewClient(&host, &token)
     if err != nil {
         resp.Diagnostics.AddError(
             "Unable to Create Masthead API Client",

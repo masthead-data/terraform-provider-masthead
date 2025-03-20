@@ -1,4 +1,4 @@
-package masthead
+package client
 
 // User represents a user in the system
 type User struct {

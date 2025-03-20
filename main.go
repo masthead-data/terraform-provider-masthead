@@ -6,7 +6,7 @@ import (
     "log"
 
     "github.com/hashicorp/terraform-plugin-framework/providerserver"
-    "github.com/masthead-data/terraform-provider-masthead-data/internal/provider"
+    "github.com/masthead-data/terraform-provider-masthead/internal/provider"
 )
 
 var (
@@ -28,7 +28,7 @@ func main() {
 		// TODO: Update this string with the published name of your provider.
 		// Also update the tfplugindocs generate command to either remove the
 		// -provider-name flag or set its value to the updated provider name.
-		Address: "hashicorp.com/edu/masthead-data", // TODO: Update this value.
+		Address: "registry.terraform.io/masthead-data/masthead",
 		Debug:   debug,
 	}
 
