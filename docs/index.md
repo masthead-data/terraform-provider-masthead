@@ -3,12 +3,10 @@
 page_title: "scaffolding Provider"
 subcategory: ""
 description: |-
-  
+
 ---
 
-# scaffolding Provider
-
-
+# masthead Provider
 
 ## Example Usage
 
