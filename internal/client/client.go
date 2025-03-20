@@ -5,10 +5,13 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"os"
 )
 
 // HostURL - Default Masthead URL
 const HostURL string = "https://metadata.mastheadata.com"
+// TokenEnvVar - Environment variable for the Masthead API token
+const TokenEnvVar string = "MASTHEAD_TOKEN"
 
 // Client -
 type Client struct {
@@ -18,19 +21,28 @@ type Client struct {
 }
 
 // NewClient -
-func NewClient(host, token *string) (*Client, error) {
+func NewClient(token *string) (*Client, error) {
 	c := Client{
 		HTTPClient: &http.Client{Timeout: 10 * time.Second},
 		// Default Masthead URL
 		HostURL: HostURL,
 	}
 
-	if host != nil {
-		c.HostURL = *host
-	}
-
 	if token != nil {
 		c.Token = *token
+	} else if token := os.Getenv(TokenEnvVar); token != "" {
+		// If the token is not provided, check for the environment variable
+		// and set it as the token.
+		// This allows the user to set the token in their environment
+		// without having to pass it explicitly.
+		// This is useful for CI/CD pipelines or other automated environments.
+		// The environment variable is expected to be set as "MASTHEAD
+		// _TOKEN" and will be used as the default token if not provided.
+		c.Token = token
+	} else {
+		// If the token is not provided and the environment variable is not set,
+		// return an error indicating that the token is required.
+		return nil, fmt.Errorf("masthead API token is required. Set the token in the configuration or use the %s environment variable", TokenEnvVar)
 	}
 
 	return &c, nil
