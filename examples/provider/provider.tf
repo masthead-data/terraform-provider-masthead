@@ -7,20 +7,16 @@ terraform {
   }
 }
 
+variable "api_token" {
+  type        = string
+  sensitive   = true
+}
+
 provider "masthead" {
   api_token = var.api_token
 }
 
-data "masthead_user" "user" {
-  email        = "user@example.com"
-}
-
-resource "masthead_user" "user" {
-  email        = data.masthead_user.user.email
-  role         = "USER"
-}
-
-variable "api_token" {
-  type        = string
-  sensitive   = true
+resource "masthead_user" "user2" {
+  email        = "user2@example.com"
+  role         = "OWNER"
 }
