@@ -11,7 +11,7 @@ import (
 // HostURL - Default Masthead URL
 const HostURL string = "https://metadata.mastheadata.com"
 // TokenEnvVar - Environment variable for the Masthead API token
-const TokenEnvVar string = "MASTHEAD_TOKEN"
+const TokenEnvVar string = "MASTHEAD_API_TOKEN"
 
 // Client -
 type Client struct {

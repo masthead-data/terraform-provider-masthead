@@ -51,7 +51,7 @@ func (p *mastheadProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				MarkdownDescription: "Masthead API Token. This token is used to authenticate with the Masthead API. " +
 					"To obtain a token, log in to your Masthead account and navigate to the **Settings / API Tokens** page. " +
 					"Create a new token and copy it here. " +
-					"Alternatively, you can set the `MASTHEAD_TOKEN` environment variable to use the token from there.",
+					"Alternatively, you can set the `MASTHEAD_API_TOKEN` environment variable to use the token from there.",
 				Required:            false,
 				Optional:            true,
 				Sensitive:           true,
@@ -77,7 +77,7 @@ func (p *mastheadProvider) Configure(ctx context.Context, req provider.Configure
 			path.Root("api_token"),
 			"Unknown Masthead API Token",
 			"The provider cannot create the Masthead API client as there is an unknown configuration value for the Masthead API token. "+
-				"Either target apply the source of the value first, set the value statically in the configuration, or use the MASTHEAD_TOKEN environment variable.",
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the MASTHEAD_API_TOKEN environment variable.",
 		)
 	}
 
@@ -88,7 +88,7 @@ func (p *mastheadProvider) Configure(ctx context.Context, req provider.Configure
 	// Default values to environment variables, but override
 	// with Terraform configuration value if set.
 
-	api_token := os.Getenv("MASTHEAD_TOKEN")
+	api_token := os.Getenv("MASTHEAD_API_TOKEN")
 
 	if !config.Token.IsNull() {
 		api_token = config.Token.ValueString()
@@ -102,7 +102,7 @@ func (p *mastheadProvider) Configure(ctx context.Context, req provider.Configure
 			path.Root("api_token"),
 			"Missing Masthead API Token",
 			"The provider cannot create the Masthead API client as there is a missing or empty value for the Masthead API token. "+
-				"Set the token value in the configuration or use the Masthead_TOKEN environment variable. "+
+				"Set the token value in the configuration or use the MASTHEAD_API_TOKEN environment variable. "+
 				"If either is already set, ensure the value is not empty.",
 		)
 	}

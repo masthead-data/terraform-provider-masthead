@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/masthead-data/masthead-client-go"
+	"github.com/masthead-data/terraform-provider-masthead/internal/client"
 )
 
 // main function to demonstrate Masthead API client usage

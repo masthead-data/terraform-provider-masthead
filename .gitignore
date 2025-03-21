@@ -24,3 +24,7 @@ go.work.sum
 # env file
 .env
 .DS_Store
+examples/provider/.terraform.lock.hcl
+examples/provider/terraform.tfstate
+examples/provider/terraform.tfstate.backup
+examples/provider/.terraform/*
