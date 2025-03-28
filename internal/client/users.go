@@ -7,6 +7,20 @@ import (
 	"strings"
 )
 
+// User represents a user in the system
+type User struct {
+	Email string `json:"email"`
+	Role  string `json:"role"`
+}
+
+// UsersResponse represents the response from the list users API
+type UsersResponse struct {
+	Values []User      `json:"values"`
+	Extra  interface{} `json:"extra"`
+	Error  interface{} `json:"error"`
+}
+
+
 // ListUsers - Returns list of all users for the tenant
 func (c *Client) ListUsers() ([]User, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/clientApi/user/list", c.HostURL), nil)
