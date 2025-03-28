@@ -9,10 +9,10 @@ import (
 
 // DataDomain represents a data domain in the system
 type DataDomain struct {
-	ID              string `json:"id,omitempty"`
-	Name            string `json:"name"`
-	Email           string `json:"email"`
-	SlackChannel    string `json:"_slackChannel,omitempty"`
+	ID           string `json:"id,omitempty"`
+	Name         string `json:"name"`
+	Email        string `json:"email"`
+	SlackChannel string `json:"_slackChannel,omitempty"`
 }
 
 // DataDomainsResponse represents the response from the list domains API
@@ -22,7 +22,7 @@ type DataDomainsResponse struct {
 	Error  interface{}  `json:"error"`
 }
 
-// ListDataDomains - Returns list of all data domains for the tenant
+// ListDataDomains - Returns list of all data domains
 func (c *Client) ListDataDomains() ([]DataDomain, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/clientApi/data-domain/list",
 		c.HostURL), nil)

@@ -20,8 +20,7 @@ type UsersResponse struct {
 	Error  interface{} `json:"error"`
 }
 
-
-// ListUsers - Returns list of all users for the tenant
+// ListUsers - Returns list of all users
 func (c *Client) ListUsers() ([]User, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/clientApi/user/list", c.HostURL), nil)
 	if err != nil {
