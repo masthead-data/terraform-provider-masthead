@@ -2,14 +2,16 @@ package provider
 
 import (
 	"context"
+	"os"
+
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
 	"github.com/masthead-data/terraform-provider-masthead/internal/client"
-	"os"
 )
 
 // Ensure mastheadProvider satisfies various provider interfaces.
@@ -30,7 +32,7 @@ type mastheadProvider struct {
 	// provider is built and ran locally, and "test" when running acceptance
 	// testing.
 	version string
-	ApiKey types.String `tfsdk:"api_token"`
+	ApiKey  types.String `tfsdk:"api_token"`
 }
 
 // mastheadProviderModel maps provider schema data to a Go type.
@@ -52,9 +54,9 @@ func (p *mastheadProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 					"To obtain a token, log in to your Masthead account and navigate to the **Settings / API Tokens** page. " +
 					"Create a new token and copy it here. " +
 					"Alternatively, you can set the `MASTHEAD_API_TOKEN` environment variable to use the token from there.",
-				Required:            false,
-				Optional:            true,
-				Sensitive:           true,
+				Required:  false,
+				Optional:  true,
+				Sensitive: true,
 			},
 		},
 	}
@@ -132,11 +134,15 @@ func (p *mastheadProvider) Configure(ctx context.Context, req provider.Configure
 func (p *mastheadProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewUserResource,
+		NewDataDomainResource,
+		NewDataProductResource,
 	}
 }
 
 func (p *mastheadProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewUserDataSource,
+		NewDataDomainDataSource,
+		NewDataProductDataSource,
 	}
 }

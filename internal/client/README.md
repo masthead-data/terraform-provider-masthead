@@ -20,7 +20,7 @@ X-API-TOKEN: <token-value>
 GET /clientApi/user/list
 ```
 
-Returns a list of all users for the tenant.
+Returns a list of all users.
 
 Example Response:
 
