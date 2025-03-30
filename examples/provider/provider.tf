@@ -26,3 +26,14 @@ resource "masthead_data_domain" "example_domain" {
   email              = "finance@example.com"
   slack_channel_name = "#finance-team"
 }
+
+resource "masthead_data_product" "example" {
+  name            = "Analytics Data Product"
+  data_domain_uuid = masthead_data_domain.example_domain.uuid
+  description     = "Product containing company analytics data"
+
+  data_assets {
+    type = "DATASET"
+    uuid = "a123b456-7890-1234-5678-9abcdef01234"
+  }
+}

@@ -29,7 +29,6 @@ type DataDomainDataSourceModel struct {
 	Name             types.String `tfsdk:"name"`
 	Email            types.String `tfsdk:"email"`
 	SlackChannelName types.String `tfsdk:"slack_channel_name"`
-	SlackChannelID   types.String `tfsdk:"slack_channel_id"`
 }
 
 func (d *DataDomainDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -54,10 +53,6 @@ func (d *DataDomainDataSource) Schema(ctx context.Context, req datasource.Schema
 			},
 			"slack_channel_name": schema.StringAttribute{
 				MarkdownDescription: "Name of the Slack channel associated with the data domain",
-				Computed:            true,
-			},
-			"slack_channel_id": schema.StringAttribute{
-				MarkdownDescription: "ID of the Slack channel associated with the data domain",
 				Computed:            true,
 			},
 		},
@@ -103,9 +98,6 @@ func (d *DataDomainDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	data.Email = types.StringValue(domain.Email)
 	if domain.SlackChannelName != "" {
 		data.SlackChannelName = types.StringValue(domain.SlackChannelName)
-	}
-	if domain.SlackChannel.ID != "" {
-		data.SlackChannelID = types.StringValue(domain.SlackChannel.ID)
 	}
 
 	tflog.Debug(ctx, "Read data domain data source", map[string]interface{}{
