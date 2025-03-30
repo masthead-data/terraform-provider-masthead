@@ -11,9 +11,6 @@ import (
 type User struct {
 	ID           string `json:"id,omitempty"`
 	Email        string `json:"email"`
-	Name         string `json:"name,omitempty"`
-	LastActivity string `json:"lastActivity,omitempty"`
-	Status       int    `json:"status,omitempty"` // Status can be 0 - Pending, 1 - Active.
 	Role         string `json:"role"`             // Role can be "OWNER" or "USER"
 }
 
