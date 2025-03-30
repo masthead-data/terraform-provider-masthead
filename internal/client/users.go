@@ -9,17 +9,17 @@ import (
 
 // User represents a user in the system
 type User struct {
-	ID    string `json:"id,omitempty"`
-	Email string `json:"email"`
-	Name  string `json:"name,omitempty"`
+	ID           string `json:"id,omitempty"`
+	Email        string `json:"email"`
+	Name         string `json:"name,omitempty"`
 	LastActivity string `json:"lastActivity,omitempty"`
-	Status int `json:"status,omitempty"` // Status can be 0 - Pending, 1 - Active.
-	Role  string `json:"role"` // Role can be "OWNER" or "USER"
+	Status       int    `json:"status,omitempty"` // Status can be 0 - Pending, 1 - Active.
+	Role         string `json:"role"`             // Role can be "OWNER" or "USER"
 }
 
 // UserResponse represents the response from the create/update user API
 type UserResponse struct {
-	User User        `json:"value"`
+	User  User        `json:"value"`
 	Extra interface{} `json:"extra"`
 	Error interface{} `json:"error"`
 }
@@ -27,8 +27,8 @@ type UserResponse struct {
 // UsersResponse represents the response from the list users API
 type UsersResponse struct {
 	Users []User      `json:"values"`
-	Extra  interface{} `json:"extra"`
-	Error  interface{} `json:"error"`
+	Extra interface{} `json:"extra"`
+	Error interface{} `json:"error"`
 }
 
 func (c *Client) ListUsers() ([]User, error) {
@@ -50,7 +50,6 @@ func (c *Client) ListUsers() ([]User, error) {
 
 	return usersResponse.Users, nil
 }
-
 
 func (c *Client) CreateUser(user User) (*User, error) {
 	rb, err := json.Marshal(user)

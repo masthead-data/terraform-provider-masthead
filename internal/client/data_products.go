@@ -12,7 +12,7 @@ type DataProductAssetType string
 
 const (
 	DataProductAssetTypeDataset DataProductAssetType = "DATASET"
-	DataProductAssetTypeTable DataProductAssetType = "TABLE"
+	DataProductAssetTypeTable   DataProductAssetType = "TABLE"
 )
 
 type DataProductAsset struct {
@@ -26,28 +26,28 @@ type Subscribers struct {
 }
 
 type DataProduct struct {
-	UUID             string             `json:"uuid"`
+	UUID           string             `json:"uuid"`
 	Name           string             `json:"name"`
 	DataDomainUUID string             `json:"_dataDomainUuid"`
 	Description    string             `json:"description"`
 	Domain         *Domain            `json:"domain"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	CreatedAt      string             `json:"createdAt"`
+	UpdatedAt      string             `json:"updatedAt"`
 	DataAssets     []DataProductAsset `json:"dataAssets"`
 }
 
 // DataProductResponse represents the response from the create/update data product API
 type DataProductResponse struct {
 	Value DataProduct `json:"value"`
-	Extra  interface{} `json:"extra"`
-	Error  interface{} `json:"error"`
+	Extra interface{} `json:"extra"`
+	Error interface{} `json:"error"`
 }
 
 // DataProductsResponse represents the response from the list data products API
 type DataProductsResponse struct {
-	Values []DataProduct `json:"values"`
-	Extra  interface{}   `json:"extra"`
-	Error  interface{}   `json:"error"`
+	Values     []DataProduct `json:"values"`
+	Extra      interface{}   `json:"extra"`
+	Error      interface{}   `json:"error"`
 	Pagination struct {
 		Total int `json:"total"`
 		Page  int `json:"page"`

@@ -14,27 +14,27 @@ type SlackChannel struct {
 
 // Domain represents a data domain in the system
 type Domain struct {
-	UUID           string `json:"uuid,omitempty"`
-	Name         string `json:"name"`
-	Email        string `json:"email"`
-	SlackChannelName string `json:"slackChannelName,omitempty"`
-	SlackChannel SlackChannel `json:"slackChannel,omitempty"`
-	CreatedAt string `json:"createdAt,omitempty"`
-	UpdatedAt string `json:"updatedAt,omitempty"`
+	UUID             string       `json:"uuid,omitempty"`
+	Name             string       `json:"name"`
+	Email            string       `json:"email"`
+	SlackChannelName string       `json:"slackChannelName,omitempty"`
+	SlackChannel     SlackChannel `json:"slackChannel,omitempty"`
+	CreatedAt        string       `json:"createdAt,omitempty"`
+	UpdatedAt        string       `json:"updatedAt,omitempty"`
 }
 
 // DomainResponse represents the response from the create/update domain API
 type DomainResponse struct {
-	Value Domain `json:"value"`
-	Extra  interface{} `json:"extra"`
-	Error  interface{} `json:"error"`
+	Value Domain      `json:"value"`
+	Extra interface{} `json:"extra"`
+	Error interface{} `json:"error"`
 }
 
 // DomainsResponse represents the response from the list domains API
 type DomainsResponse struct {
-	Values []Domain `json:"values"`
-	Extra  interface{}  `json:"extra"`
-	Error  interface{}  `json:"error"`
+	Values []Domain    `json:"values"`
+	Extra  interface{} `json:"extra"`
+	Error  interface{} `json:"error"`
 }
 
 // ListDomains - Returns list of all data domains

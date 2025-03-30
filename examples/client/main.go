@@ -35,7 +35,6 @@ func apiClientExample(client *masthead.Client) {
 	testUser := masthead.User{
 		Email: "testuser@example.com",
 		Role:  "USER",
-
 	}
 
 	// Call CreateUser with sample data
@@ -91,8 +90,8 @@ func apiClientExample(client *masthead.Client) {
 
 	// Sample data for creating a data domain
 	testDomain := masthead.Domain{
-		Name: "API Test Domain",
-		Email: "domain@example.com",
+		Name:             "API Test Domain",
+		Email:            "domain@example.com",
 		SlackChannelName: "10x-infra",
 	}
 
@@ -169,8 +168,8 @@ func apiClientExample(client *masthead.Client) {
 
 	// Sample data for creating a data product
 	testProduct := masthead.DataProduct{
-		Name: "Test Product",
-		Description: "Data Product for API testing",
+		Name:           "Test Product",
+		Description:    "Data Product for API testing",
 		DataDomainUUID: domainUUID,
 		DataAssets:     dataAssets,
 	}

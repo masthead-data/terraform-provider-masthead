@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 	"os"
+	"time"
 )
 
 // HostURL - Default Masthead URL
 const HostURL string = "https://metadata.mastheadata.com"
+
 // TokenEnvVar - Environment variable for the Masthead API token
 const TokenEnvVar string = "MASTHEAD_API_TOKEN"
 
