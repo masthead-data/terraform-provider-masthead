@@ -29,7 +29,6 @@ type UserResource struct {
 
 // UserResourceModel describes the resource data model.
 type UserResourceModel struct {
-	Id    types.String `tfsdk:"id"`
 	Email types.String `tfsdk:"email"`
 	Role  types.String `tfsdk:"role"`
 }
@@ -42,16 +41,12 @@ func (r *UserResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a Masthead user",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				MarkdownDescription: "Unique identifier for the user.",
-				Computed:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
 			"email": schema.StringAttribute{
 				MarkdownDescription: "Email address of the user",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"role": schema.StringAttribute{
 				MarkdownDescription: "Role of the user (e.g., USER, OWNER)",
@@ -80,12 +75,18 @@ func (r *UserResource) Configure(ctx context.Context, req resource.ConfigureRequ
 }
 
 func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var user UserResourceModel
+	var data UserResourceModel
 
 	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &user)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	// Create user object
+	user := masthead.User{
+		Email: data.Email.ValueString(),
+		Role:  data.Role.ValueString(),
 	}
 
 	// Create new user
@@ -123,7 +124,6 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	found := false
 	for _, user := range users {
 		if user.Email == data.Email.ValueString() {
-			data.Id = types.StringValue(user.Id)
 			data.Role = types.StringValue(user.Role)
 			found = true
 			break
@@ -149,8 +149,12 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	// Update existing user role
-	updatedUser, err := r.client.UpdateUserRole(data)
+	user := masthead.User{
+		Email: data.Email.ValueString(),
+		Role:  data.Role.ValueString(),
+	}
+
+	updatedUser, err := r.client.UpdateUserRole(user)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update user, got error: %s", err))
 		return

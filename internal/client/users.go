@@ -9,9 +9,8 @@ import (
 
 // User represents a user in the system
 type User struct {
-	ID           string `json:"id,omitempty"`
-	Email        string `json:"email"`
-	Role         string `json:"role"`             // Role can be "OWNER" or "USER"
+	Email string `json:"email"`
+	Role  string `json:"role"` // Role can be "OWNER" or "USER"
 }
 
 // UserResponse represents the response from the create/update user API

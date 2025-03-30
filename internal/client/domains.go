@@ -7,18 +7,12 @@ import (
 	"strings"
 )
 
-type SlackChannel struct {
-	ID   string `json:"channelId"`
-	Name string `json:"channelName"`
-}
-
 // Domain represents a data domain in the system
 type Domain struct {
 	UUID             string       `json:"uuid,omitempty"`
 	Name             string       `json:"name"`
 	Email            string       `json:"email"`
 	SlackChannelName string       `json:"slackChannelName,omitempty"`
-	SlackChannel     SlackChannel `json:"slackChannel,omitempty"`
 }
 
 // DomainResponse represents the response from the create/update domain API

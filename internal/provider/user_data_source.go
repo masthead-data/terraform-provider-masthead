@@ -92,7 +92,6 @@ func (d *UserDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	found := false
 	for _, user := range users {
 		if user.Email == data.Email.ValueString() {
-			data.Id = types.StringValue(user.ID)
 			data.Role = types.StringValue(user.Role)
 			found = true
 			break

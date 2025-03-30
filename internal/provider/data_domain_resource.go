@@ -110,8 +110,8 @@ func (r *DataDomainResource) Create(ctx context.Context, req resource.CreateRequ
 	data.UUID = types.StringValue(createdDomain.UUID)
 	data.Name = types.StringValue(createdDomain.Name)
 	data.Email = types.StringValue(createdDomain.Email)
-	if createdDomain.SlackChannel != nil {
-		data.SlackChannelName = types.StringValue(createdDomain.SlackChannel.Name)
+	if createdDomain.SlackChannelName != "" {
+		data.SlackChannelName = types.StringValue(createdDomain.SlackChannelName)
 	} else {
 		data.SlackChannelName = types.StringNull()
 	}
@@ -142,7 +142,7 @@ func (r *DataDomainResource) Read(ctx context.Context, req resource.ReadRequest,
 	data.UUID = types.StringValue(domain.UUID)
 	data.Name = types.StringValue(domain.Name)
 	data.Email = types.StringValue(domain.Email)
-	if domain.SlackChannelName != nil {
+	if domain.SlackChannelName != "" {
 		data.SlackChannelName = types.StringValue(domain.SlackChannelName)
 	} else {
 		data.SlackChannelName = types.StringNull()
@@ -178,7 +178,7 @@ func (r *DataDomainResource) Update(ctx context.Context, req resource.UpdateRequ
 	// Map response to model
 	data.Name = types.StringValue(updatedDomain.Name)
 	data.Email = types.StringValue(updatedDomain.Email)
-	if updatedDomain.SlackChannel != nil {
+	if updatedDomain.SlackChannelName != "" {
 		data.SlackChannelName = types.StringValue(updatedDomain.SlackChannelName)
 	} else {
 		data.SlackChannelName = types.StringNull()
