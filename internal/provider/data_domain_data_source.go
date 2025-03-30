@@ -30,8 +30,6 @@ type DataDomainDataSourceModel struct {
 	Email            types.String `tfsdk:"email"`
 	SlackChannelName types.String `tfsdk:"slack_channel_name"`
 	SlackChannelID   types.String `tfsdk:"slack_channel_id"`
-	CreatedAt        types.String `tfsdk:"created_at"`
-	UpdatedAt        types.String `tfsdk:"updated_at"`
 }
 
 func (d *DataDomainDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -48,11 +46,11 @@ func (d *DataDomainDataSource) Schema(ctx context.Context, req datasource.Schema
 			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "Name of the data domain",
-				Required:            true,
+				Computed:            true,
 			},
 			"email": schema.StringAttribute{
 				MarkdownDescription: "Email associated with the data domain",
-				Required:            true,
+				Computed:            true,
 			},
 			"slack_channel_name": schema.StringAttribute{
 				MarkdownDescription: "Name of the Slack channel associated with the data domain",
@@ -103,8 +101,8 @@ func (d *DataDomainDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	// Map response body to model
 	data.Name = types.StringValue(domain.Name)
 	data.Email = types.StringValue(domain.Email)
-	if domain.SlackChannel.Name != "" {
-		data.SlackChannelName = types.StringValue(domain.SlackChannel.Name)
+	if domain.SlackChannelName != "" {
+		data.SlackChannelName = types.StringValue(domain.SlackChannelName)
 	}
 	if domain.SlackChannel.ID != "" {
 		data.SlackChannelID = types.StringValue(domain.SlackChannel.ID)

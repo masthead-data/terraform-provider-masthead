@@ -33,7 +33,6 @@ type DataDomainResourceModel struct {
 	Name             types.String `tfsdk:"name"`
 	Email            types.String `tfsdk:"email"`
 	SlackChannelName types.String `tfsdk:"slack_channel_name"`
-	SlackChannelID   types.String `tfsdk:"slack_channel_id"`
 }
 
 func (r *DataDomainResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -63,10 +62,6 @@ func (r *DataDomainResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "Name of the Slack channel associated with the data domain",
 				Optional:            true,
 			},
-			"slack_channel_id": schema.StringAttribute{
-				MarkdownDescription: "ID of the Slack channel associated with the data domain",
-				Computed:            true,
-			},
 		},
 	}
 }
@@ -90,12 +85,19 @@ func (r *DataDomainResource) Configure(ctx context.Context, req resource.Configu
 }
 
 func (r *DataDomainResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var domain DataDomainResourceModel
+	var data DataDomainResourceModel
 
 	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &domain)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	// Create new domain
+	domain := masthead.Domain{
+		Name:             data.Name.ValueString(),
+		Email:            data.Email.ValueString(),
+		SlackChannelName: data.SlackChannelName.ValueString(),
 	}
 
 	createdDomain, err := r.client.CreateDomain(domain)
@@ -104,10 +106,20 @@ func (r *DataDomainResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
+	// Map response to model
+	data.UUID = types.StringValue(createdDomain.UUID)
+	data.Name = types.StringValue(createdDomain.Name)
+	data.Email = types.StringValue(createdDomain.Email)
+	if createdDomain.SlackChannel != nil {
+		data.SlackChannelName = types.StringValue(createdDomain.SlackChannel.Name)
+	} else {
+		data.SlackChannelName = types.StringNull()
+	}
+
 	tflog.Trace(ctx, "created a data domain resource")
 
 	// Save data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &createdDomain)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *DataDomainResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -126,17 +138,35 @@ func (r *DataDomainResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
+	// Map response to model
+	data.UUID = types.StringValue(domain.UUID)
+	data.Name = types.StringValue(domain.Name)
+	data.Email = types.StringValue(domain.Email)
+	if domain.SlackChannelName != nil {
+		data.SlackChannelName = types.StringValue(domain.SlackChannelName)
+	} else {
+		data.SlackChannelName = types.StringNull()
+	}
+
 	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &domain)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *DataDomainResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var domain DataDomainResourceModel
+	var data DataDomainResourceModel
 
 	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &domain)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	// Update existing domain
+	domain := masthead.Domain{
+		UUID:             data.UUID.ValueString(),
+		Name:             data.Name.ValueString(),
+		Email:            data.Email.ValueString(),
+		SlackChannelName: data.SlackChannelName.ValueString(),
 	}
 
 	updatedDomain, err := r.client.UpdateDomain(domain)
@@ -145,10 +175,19 @@ func (r *DataDomainResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
+	// Map response to model
+	data.Name = types.StringValue(updatedDomain.Name)
+	data.Email = types.StringValue(updatedDomain.Email)
+	if updatedDomain.SlackChannel != nil {
+		data.SlackChannelName = types.StringValue(updatedDomain.SlackChannelName)
+	} else {
+		data.SlackChannelName = types.StringNull()
+	}
+
 	tflog.Trace(ctx, "updated a data domain resource")
 
 	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &updatedDomain)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *DataDomainResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

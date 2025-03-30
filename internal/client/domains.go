@@ -19,8 +19,6 @@ type Domain struct {
 	Email            string       `json:"email"`
 	SlackChannelName string       `json:"slackChannelName,omitempty"`
 	SlackChannel     SlackChannel `json:"slackChannel,omitempty"`
-	CreatedAt        string       `json:"createdAt,omitempty"`
-	UpdatedAt        string       `json:"updatedAt,omitempty"`
 }
 
 // DomainResponse represents the response from the create/update domain API
