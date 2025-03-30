@@ -9,18 +9,28 @@ import (
 
 // User represents a user in the system
 type User struct {
+	ID    string `json:"id,omitempty"`
 	Email string `json:"email"`
-	Role  string `json:"role"`
+	Name  string `json:"name,omitempty"`
+	LastActivity string `json:"lastActivity,omitempty"`
+	Status int `json:"status,omitempty"` // Status can be 0 - Pending, 1 - Active.
+	Role  string `json:"role"` // Role can be "OWNER" or "USER"
+}
+
+// UserResponse represents the response from the create/update user API
+type UserResponse struct {
+	User User        `json:"value"`
+	Extra interface{} `json:"extra"`
+	Error interface{} `json:"error"`
 }
 
 // UsersResponse represents the response from the list users API
 type UsersResponse struct {
-	Values []User      `json:"values"`
+	Users []User      `json:"values"`
 	Extra  interface{} `json:"extra"`
 	Error  interface{} `json:"error"`
 }
 
-// ListUsers - Returns list of all users
 func (c *Client) ListUsers() ([]User, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/clientApi/user/list", c.HostURL), nil)
 	if err != nil {
@@ -38,61 +48,61 @@ func (c *Client) ListUsers() ([]User, error) {
 		return nil, err
 	}
 
-	return usersResponse.Values, nil
+	return usersResponse.Users, nil
 }
 
-// CreateUser - Create a new user in the system
-func (c *Client) CreateUser(email, role string) error {
-	userReq := struct {
-		Email string `json:"email"`
-		Role  string `json:"role"`
-	}{
-		Email: email,
-		Role:  role,
-	}
 
-	rb, err := json.Marshal(userReq)
+func (c *Client) CreateUser(user User) (*User, error) {
+	rb, err := json.Marshal(user)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/clientApi/user", c.HostURL), strings.NewReader(string(rb)))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = c.doRequest(req)
-	return err
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	userResponse := UserResponse{}
+	err = json.Unmarshal(body, &userResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	return &userResponse.User, nil
 }
 
-// UpdateUserRole - Update an existing user's role
-// UpdateUserRole changes the role of a user in the Masthead system.
-// It takes the user's email address and the new role to assign.
-// Returns an error if the request cannot be created or if the API returns an error response.
-func (c *Client) UpdateUserRole(email, role string) error {
-	userReq := struct {
-		Email string `json:"email"`
-		Role  string `json:"role"`
-	}{
-		Email: email,
-		Role:  role,
-	}
-
-	rb, err := json.Marshal(userReq)
+func (c *Client) UpdateUserRole(user User) (*User, error) {
+	rb, err := json.Marshal(user)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	req, err := http.NewRequest("PUT", fmt.Sprintf("%s/clientApi/user/role", c.HostURL), strings.NewReader(string(rb)))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = c.doRequest(req)
-	return err
+	body, err := c.doRequest(req) // Changed from `body, err = c.doRequest(req)` to `body, err := c.doRequest(req)`
+	if err != nil {
+		return nil, err
+	}
+
+	userResponse := UserResponse{}
+	err = json.Unmarshal(body, &userResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	return &userResponse.User, nil
 }
 
-// DeleteUser - Remove a user from the system by their email address
+// DeleteUser - Remove a user by the email address
 func (c *Client) DeleteUser(email string) error {
 	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/clientApi/user/%s", c.HostURL, email), nil)
 	if err != nil {

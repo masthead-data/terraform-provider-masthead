@@ -7,23 +7,38 @@ import (
 	"strings"
 )
 
-// DataDomain represents a data domain in the system
-type DataDomain struct {
-	ID           string `json:"id,omitempty"`
-	Name         string `json:"name"`
-	Email        string `json:"email"`
-	SlackChannel string `json:"_slackChannel,omitempty"`
+type SlackChannel struct {
+	ID   string `json:"channelId"`
+	Name string `json:"channelName"`
 }
 
-// DataDomainsResponse represents the response from the list domains API
-type DataDomainsResponse struct {
-	Values []DataDomain `json:"values"`
+// Domain represents a data domain in the system
+type Domain struct {
+	UUID           string `json:"uuid,omitempty"`
+	Name         string `json:"name"`
+	Email        string `json:"email"`
+	SlackChannelName string `json:"slackChannelName,omitempty"`
+	SlackChannel SlackChannel `json:"slackChannel,omitempty"`
+	CreatedAt string `json:"createdAt,omitempty"`
+	UpdatedAt string `json:"updatedAt,omitempty"`
+}
+
+// DomainResponse represents the response from the create/update domain API
+type DomainResponse struct {
+	Value Domain `json:"value"`
+	Extra  interface{} `json:"extra"`
+	Error  interface{} `json:"error"`
+}
+
+// DomainsResponse represents the response from the list domains API
+type DomainsResponse struct {
+	Values []Domain `json:"values"`
 	Extra  interface{}  `json:"extra"`
 	Error  interface{}  `json:"error"`
 }
 
-// ListDataDomains - Returns list of all data domains
-func (c *Client) ListDataDomains() ([]DataDomain, error) {
+// ListDomains - Returns list of all data domains
+func (c *Client) ListDomains() ([]Domain, error) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/clientApi/data-domain/list",
 		c.HostURL), nil)
 	if err != nil {
@@ -35,7 +50,7 @@ func (c *Client) ListDataDomains() ([]DataDomain, error) {
 		return nil, err
 	}
 
-	domainsResponse := DataDomainsResponse{}
+	domainsResponse := DomainsResponse{}
 	err = json.Unmarshal(body, &domainsResponse)
 	if err != nil {
 		return nil, err
@@ -44,35 +59,36 @@ func (c *Client) ListDataDomains() ([]DataDomain, error) {
 	return domainsResponse.Values, nil
 }
 
-// CreateDataDomain - Create a new data domain in the system
-func (c *Client) CreateDataDomain(name, email string, slackChannelName *string) error {
-	domainReq := DataDomain{
-		Name:  name,
-		Email: email,
-	}
-
-	if slackChannelName != nil {
-		domainReq.SlackChannel = *slackChannelName
-	}
-
-	rb, err := json.Marshal(domainReq)
+// CreateDomain - Create a new data domain in the system
+func (c *Client) CreateDomain(domain Domain) (*Domain, error) {
+	rb, err := json.Marshal(domain)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	req, err := http.NewRequest("POST",
 		fmt.Sprintf("%s/clientApi/data-domain", c.HostURL),
 		strings.NewReader(string(rb)))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = c.doRequest(req)
-	return err
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	domainResponse := &Domain{}
+	err = json.Unmarshal(body, domainResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	return domainResponse, nil
 }
 
-// GetDataDomain - Get a specific data domain by ID
-func (c *Client) GetDataDomain(domainID string) (*DataDomain, error) {
+// GetDomain - Get a specific data domain by ID
+func (c *Client) GetDomain(domainID string) (*Domain, error) {
 	req, err := http.NewRequest("GET",
 		fmt.Sprintf("%s/clientApi/data-domain/%s", c.HostURL, domainID),
 		nil)
@@ -85,45 +101,45 @@ func (c *Client) GetDataDomain(domainID string) (*DataDomain, error) {
 		return nil, err
 	}
 
-	domain := &DataDomain{}
-	err = json.Unmarshal(body, domain)
+	domainResponse := &Domain{}
+	err = json.Unmarshal(body, domainResponse)
 	if err != nil {
 		return nil, err
 	}
 
-	return domain, nil
+	return domainResponse, nil
 }
 
-// UpdateDataDomain - Update an existing data domain
-func (c *Client) UpdateDataDomain(domainID string, name, email string, slackChannelName *string) error {
-	domainReq := DataDomain{
-		ID:    domainID,
-		Name:  name,
-		Email: email,
-	}
-
-	if slackChannelName != nil {
-		domainReq.SlackChannel = *slackChannelName
-	}
-
-	rb, err := json.Marshal(domainReq)
+// UpdateDomain - Update an existing data domain
+func (c *Client) UpdateDomain(domain Domain) (*Domain, error) {
+	rb, err := json.Marshal(domain)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	req, err := http.NewRequest("POST",
-		fmt.Sprintf("%s/clientApi/data-domain/%s", c.HostURL, domainID),
+		fmt.Sprintf("%s/clientApi/data-domain/%s", c.HostURL, domain.UUID),
 		strings.NewReader(string(rb)))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = c.doRequest(req)
-	return err
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	domainResponse := &Domain{}
+	err = json.Unmarshal(body, domainResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	return domainResponse, nil
 }
 
-// DeleteDataDomain - Remove a data domain from the system by ID
-func (c *Client) DeleteDataDomain(domainID string) error {
+// DeleteDomain - Remove a data domain from the system by ID
+func (c *Client) DeleteDomain(domainID string) error {
 	req, err := http.NewRequest("DELETE",
 		fmt.Sprintf("%s/clientApi/data-domain/%s", c.HostURL, domainID),
 		nil)
