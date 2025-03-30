@@ -16,7 +16,13 @@ provider "masthead" {
   api_token = var.api_token
 }
 
-resource "masthead_user" "user2" {
-  email        = "user2@example.com"
+resource "masthead_user" "example_user" {
+  email        = "user@example.com"
   role         = "OWNER"
+}
+
+resource "masthead_data_domain" "example_domain" {
+  name               = "Finance Domain"
+  email              = "finance@example.com"
+  slack_channel_name = "#finance-team"
 }
