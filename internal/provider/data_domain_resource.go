@@ -1,0 +1,175 @@
+package provider
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
+	masthead "github.com/masthead-data/terraform-provider-masthead/internal/client"
+)
+
+// Ensure provider defined types fully satisfy framework interfaces
+var _ resource.Resource = &DataDomainResource{}
+var _ resource.ResourceWithImportState = &DataDomainResource{}
+
+func NewDataDomainResource() resource.Resource {
+	return &DataDomainResource{}
+}
+
+// DataDomainResource defines the resource implementation.
+type DataDomainResource struct {
+	client *masthead.Client
+}
+
+// DataDomainResourceModel describes the resource data model.
+type DataDomainResourceModel struct {
+	UUID             types.String `tfsdk:"uuid"`
+	Name             types.String `tfsdk:"name"`
+	Email            types.String `tfsdk:"email"`
+	SlackChannelName types.String `tfsdk:"slack_channel_name"`
+	SlackChannelID   types.String `tfsdk:"slack_channel_id"`
+}
+
+func (r *DataDomainResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_data_domain"
+}
+
+func (r *DataDomainResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		MarkdownDescription: "Manages a Masthead data domain",
+		Attributes: map[string]schema.Attribute{
+			"uuid": schema.StringAttribute{
+				MarkdownDescription: "UUID of the data domain",
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"name": schema.StringAttribute{
+				MarkdownDescription: "Name of the data domain",
+				Required:            true,
+			},
+			"email": schema.StringAttribute{
+				MarkdownDescription: "Email associated with the data domain",
+				Required:            true,
+			},
+			"slack_channel_name": schema.StringAttribute{
+				MarkdownDescription: "Name of the Slack channel associated with the data domain",
+				Optional:            true,
+			},
+			"slack_channel_id": schema.StringAttribute{
+				MarkdownDescription: "ID of the Slack channel associated with the data domain",
+				Computed:            true,
+			},
+		},
+	}
+}
+
+func (r *DataDomainResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	// Prevent panic if the provider has not been configured.
+	if req.ProviderData == nil {
+		return
+	}
+
+	client, ok := req.ProviderData.(*masthead.Client)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected *masthead.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+		return
+	}
+
+	r.client = client
+}
+
+func (r *DataDomainResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var domain DataDomainResourceModel
+
+	// Read Terraform plan data into the model
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &domain)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	createdDomain, err := r.client.CreateDomain(domain)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create data domain, got error: %s", err))
+		return
+	}
+
+	tflog.Trace(ctx, "created a data domain resource")
+
+	// Save data into Terraform state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &createdDomain)...)
+}
+
+func (r *DataDomainResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var data DataDomainResourceModel
+
+	// Read Terraform prior state data into the model
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Get domain by UUID
+	domain, err := r.client.GetDomain(data.UUID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read data domain, got error: %s", err))
+		return
+	}
+
+	// Save updated data into Terraform state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &domain)...)
+}
+
+func (r *DataDomainResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var domain DataDomainResourceModel
+
+	// Read Terraform plan data into the model
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &domain)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	updatedDomain, err := r.client.UpdateDomain(domain)
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update data domain, got error: %s", err))
+		return
+	}
+
+	tflog.Trace(ctx, "updated a data domain resource")
+
+	// Save updated data into Terraform state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &updatedDomain)...)
+}
+
+func (r *DataDomainResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var domain DataDomainResourceModel
+
+	// Read Terraform prior state data into the model
+	resp.Diagnostics.Append(req.State.Get(ctx, &domain)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Delete domain
+	err := r.client.DeleteDomain(domain.UUID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete data domain, got error: %s", err))
+		return
+	}
+
+	tflog.Trace(ctx, "deleted a data domain resource")
+}
+
+func (r *DataDomainResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resource.ImportStatePassthroughID(ctx, path.Root("uuid"), req, resp)
+}

@@ -134,11 +134,13 @@ func (p *mastheadProvider) Configure(ctx context.Context, req provider.Configure
 func (p *mastheadProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewUserResource,
+		NewDataDomainResource,
 	}
 }
 
 func (p *mastheadProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewUserDataSource,
+		NewDataDomainDataSource,
 	}
 }
