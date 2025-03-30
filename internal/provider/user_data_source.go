@@ -25,6 +25,7 @@ type UserDataSource struct {
 
 // UserDataSourceModel describes the data source data model.
 type UserDataSourceModel struct {
+	Id    types.String `tfsdk:"id"`
 	Email types.String `tfsdk:"email"`
 	Role  types.String `tfsdk:"role"`
 }
@@ -37,6 +38,10 @@ func (d *UserDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Fetch information about a Masthead user",
 		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				MarkdownDescription: "Unique identifier for the user.",
+				Computed:            true,
+			},
 			"email": schema.StringAttribute{
 				MarkdownDescription: "Email address of the user",
 				Required:            true,
@@ -87,6 +92,7 @@ func (d *UserDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	found := false
 	for _, user := range users {
 		if user.Email == data.Email.ValueString() {
+			data.Id = types.StringValue(user.ID)
 			data.Role = types.StringValue(user.Role)
 			found = true
 			break

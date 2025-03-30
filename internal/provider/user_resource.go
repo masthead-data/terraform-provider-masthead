@@ -29,6 +29,7 @@ type UserResource struct {
 
 // UserResourceModel describes the resource data model.
 type UserResourceModel struct {
+	Id    types.String `tfsdk:"id"`
 	Email types.String `tfsdk:"email"`
 	Role  types.String `tfsdk:"role"`
 }
@@ -41,12 +42,16 @@ func (r *UserResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a Masthead user",
 		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				MarkdownDescription: "Unique identifier for the user.",
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"email": schema.StringAttribute{
 				MarkdownDescription: "Email address of the user",
 				Required:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 			},
 			"role": schema.StringAttribute{
 				MarkdownDescription: "Role of the user (e.g., USER, OWNER)",
@@ -75,16 +80,16 @@ func (r *UserResource) Configure(ctx context.Context, req resource.ConfigureRequ
 }
 
 func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data UserResourceModel
+	var user UserResourceModel
 
 	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &user)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Create new user
-	err := r.client.CreateUser(data.Email.ValueString(), data.Role.ValueString())
+	createdUser, err := r.client.CreateUser(user)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create user, got error: %s", err))
 		return
@@ -95,7 +100,7 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 	tflog.Trace(ctx, "created a user resource")
 
 	// Save data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &createdUser)...)
 }
 
 func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -118,6 +123,7 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	found := false
 	for _, user := range users {
 		if user.Email == data.Email.ValueString() {
+			data.Id = types.StringValue(user.Id)
 			data.Role = types.StringValue(user.Role)
 			found = true
 			break
@@ -144,7 +150,7 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	// Update existing user role
-	err := r.client.UpdateUserRole(data.Email.ValueString(), data.Role.ValueString())
+	updatedUser, err := r.client.UpdateUserRole(data)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update user, got error: %s", err))
 		return
@@ -153,20 +159,20 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	tflog.Trace(ctx, "updated a user resource")
 
 	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &updatedUser)...)
 }
 
 func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data UserResourceModel
+	var user UserResourceModel
 
 	// Read Terraform prior state data into the model
-	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &user)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Delete user
-	err := r.client.DeleteUser(data.Email.ValueString())
+	err := r.client.DeleteUser(user.Email.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete user, got error: %s", err))
 		return
