@@ -1,15 +1,15 @@
 terraform {
   required_providers {
     masthead = {
-      source = "masthead-data/masthead"
+      source  = "masthead-data/masthead"
       version = "0.1.0"
     }
   }
 }
 
 variable "api_token" {
-  type        = string
-  sensitive   = true
+  type      = string
+  sensitive = true
 }
 
 provider "masthead" {
@@ -17,8 +17,8 @@ provider "masthead" {
 }
 
 resource "masthead_user" "example_user" {
-  email        = "user@example.com"
-  role         = "OWNER"
+  email = "user@example.com"
+  role  = "OWNER"
 }
 
 resource "masthead_data_domain" "example_domain" {
@@ -28,9 +28,9 @@ resource "masthead_data_domain" "example_domain" {
 }
 
 resource "masthead_data_product" "example" {
-  name            = "Analytics Data Product"
+  name             = "Analytics Data Product"
   data_domain_uuid = masthead_data_domain.example_domain.uuid
-  description     = "Product containing company analytics data"
+  description      = "Product containing company analytics data"
 
   data_assets {
     type = "DATASET"
