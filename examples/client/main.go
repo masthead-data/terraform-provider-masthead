@@ -6,6 +6,8 @@ import (
 	"os"
 
 	"github.com/masthead-data/terraform-provider-masthead/internal/client"
+
+	// For local testing:
 	//"masthead"
 )
 
