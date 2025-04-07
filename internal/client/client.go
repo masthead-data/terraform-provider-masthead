@@ -84,3 +84,23 @@ func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 
 	return body, err
 }
+
+// User represents a user in the system
+type User struct {
+	Email string `json:"email"`
+	Role  string `json:"role"` // Role can be "OWNER" or "USER"
+}
+
+// UserResponse represents the response from the create/update user API
+type UserResponse struct {
+	User  User        `json:"value"`
+	Extra interface{} `json:"extra"`
+	Error interface{} `json:"error"`
+}
+
+// UsersResponse represents the response from the list users API
+type UsersResponse struct {
+	Users []User      `json:"values"`
+	Extra interface{} `json:"extra"`
+	Error interface{} `json:"error"`
+}

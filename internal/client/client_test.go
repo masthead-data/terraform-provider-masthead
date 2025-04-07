@@ -2,7 +2,6 @@ package masthead
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"testing"
 
@@ -24,7 +23,7 @@ func TestClient(t *testing.T) {
 
 	// Call the example function to demonstrate API operations
 	apiClientExample(apiClient, t)
-	fmt.Println("Example usage completed successfully")
+	fmt.Println("Completed successfully")
 }
 
 // userExample demonstrates the User API operations
@@ -90,10 +89,7 @@ func apiClientExample(client *Client, t *testing.T) {
 	if err == nil {
 		t.Logf("List of data domains:")
 		for _, domain := range domains {
-			fmt.Printf("- ID: %s, Name: %s, Email: %s\n", domain.UUID, domain.Name, domain.Email)
-			if domain.SlackChannelName != "" {
-				fmt.Printf("  Slack Channel: %s\n", domain.SlackChannelName)
-			}
+			fmt.Printf("- ID: %s, Name: %s, Email: %s, Slack Channel: %s\n", domain.UUID, domain.Name, domain.Email, domain.SlackChannel)
 
 		}
 	}
@@ -121,11 +117,14 @@ func apiClientExample(client *Client, t *testing.T) {
 	dataAssets := []DataProductAsset{
 		{
 			Type: DataProductAssetTypeDataset,
-			UUID: "1583db12-9ed3-3458-ad99-8c25413f6a5b",
+			Project: "httparchive",
+			Dataset: "scratchspace",
 		},
 		{
 			Type: DataProductAssetTypeTable,
-			UUID: "5656f586-d9d5-3f7a-b9f2-06a44f72e5f2",
+			Project: "httparchive",
+			Dataset: "crawl",
+			Table:   "pages",
 		},
 	}
 
@@ -182,7 +181,9 @@ func apiClientExample(client *Client, t *testing.T) {
 		// Add an additional data asset for the update
 		testProduct.DataAssets = append(testProduct.DataAssets, DataProductAsset{
 			Type: DataProductAssetTypeTable,
-			UUID: "7777f586-d9d5-3f7a-b9f2-06a44f72e9a9",
+			Project: "httparchive",
+			Dataset: "sample_data",
+			Table:   "pages_10k",
 		})
 
 		dataProduct, err = client.UpdateDataProduct(testProduct)
