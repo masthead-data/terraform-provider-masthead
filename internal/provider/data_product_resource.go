@@ -29,8 +29,12 @@ type DataProductResource struct {
 
 // DataProductAssetResourceModel describes a data asset in the resource model
 type DataProductAssetResourceModel struct {
-	Type types.String `tfsdk:"type"`
+	Type masthead.DataProductAssetType `tfsdk:"type"`
 	UUID types.String `tfsdk:"uuid"`
+	Project types.String `tfsdk:"project"`
+	Dataset types.String `tfsdk:"dataset"`
+	Table types.String `tfsdk:"table"`
+	AlertType masthead.AlertType `tfsdk:"alert_type"`
 }
 
 // DataProductResourceModel describes the resource data model.
@@ -38,6 +42,7 @@ type DataProductResourceModel struct {
 	UUID           types.String                    `tfsdk:"uuid"`
 	Name           types.String                    `tfsdk:"name"`
 	DataDomainUUID types.String                    `tfsdk:"data_domain_uuid"`
+	DataDomain         DataDomainResourceModel         `tfsdk:"domain"`
 	Description    types.String                    `tfsdk:"description"`
 	DataAssets     []DataProductAssetResourceModel `tfsdk:"data_assets"`
 }
@@ -65,6 +70,53 @@ func (r *DataProductResource) Schema(ctx context.Context, req resource.SchemaReq
 				MarkdownDescription: "UUID of the data domain this product belongs to",
 				Required:            true,
 			},
+			"domain": schema.SingleNestedAttribute{
+				MarkdownDescription: "Data domain associated with this data product",
+				Computed:            true,
+				Attributes: map[string]schema.Attribute{
+					"uuid": schema.StringAttribute{
+						MarkdownDescription: "UUID of the data domain",
+						Computed:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"name": schema.StringAttribute{
+						MarkdownDescription: "Name of the data domain",
+						Computed:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"email": schema.StringAttribute{
+						MarkdownDescription: "Email associated with the data domain",
+						Computed:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"slack_channel": schema.SingleNestedAttribute{
+						MarkdownDescription: "Slack channel associated with the data domain",
+						Computed:            true,
+						Attributes: map[string]schema.Attribute{
+							"name": schema.StringAttribute{
+								MarkdownDescription: "Name of the Slack channel",
+								Computed:            true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+								},
+							},
+							"id": schema.StringAttribute{
+								MarkdownDescription: "ID of the Slack channel",
+								Computed:            true,
+								PlanModifiers: []planmodifier.String{
+									stringplanmodifier.UseStateForUnknown(),
+								},
+							},
+						},
+					},
+				},
+			},
 			"description": schema.StringAttribute{
 				MarkdownDescription: "Description of the data product",
 				Optional:            true,
@@ -81,6 +133,26 @@ func (r *DataProductResource) Schema(ctx context.Context, req resource.SchemaReq
 						"uuid": schema.StringAttribute{
 							MarkdownDescription: "UUID of the data asset",
 							Required:            true,
+						},
+						"project": schema.StringAttribute{
+							MarkdownDescription: "Project associated with the data asset",
+							Optional:            true,
+							Computed:            true,
+						},
+						"dataset": schema.StringAttribute{
+							MarkdownDescription: "Dataset associated with the data asset",
+							Optional:            true,
+							Computed:            true,
+						},
+						"table": schema.StringAttribute{
+							MarkdownDescription: "Table associated with the data asset",
+							Optional:            true,
+							Computed:            true,
+						},
+						"alert_type": schema.StringAttribute{
+							MarkdownDescription: "Alert type associated with the data asset",
+							Optional:            true,
+							Computed:            true,
 						},
 					},
 				},
@@ -128,8 +200,10 @@ func (r *DataProductResource) Create(ctx context.Context, req resource.CreateReq
 		product.DataAssets = make([]masthead.DataProductAsset, 0, len(data.DataAssets))
 		for _, asset := range data.DataAssets {
 			product.DataAssets = append(product.DataAssets, masthead.DataProductAsset{
-				Type: masthead.DataProductAssetType(asset.Type.ValueString()),
 				UUID: asset.UUID.ValueString(),
+				Project: asset.Project.ValueString(),
+				Dataset: asset.Dataset.ValueString(),
+				Table: asset.Table.ValueString(),
 			})
 		}
 	}
@@ -143,7 +217,6 @@ func (r *DataProductResource) Create(ctx context.Context, req resource.CreateReq
 	// Map response to model
 	data.UUID = types.StringValue(createdProduct.UUID)
 	data.Name = types.StringValue(createdProduct.Name)
-	data.DataDomainUUID = types.StringValue(createdProduct.DataDomainUUID)
 	data.Description = types.StringValue(createdProduct.Description)
 
 	// Map data assets
@@ -151,11 +224,28 @@ func (r *DataProductResource) Create(ctx context.Context, req resource.CreateReq
 		dataAssets := make([]DataProductAssetResourceModel, 0, len(createdProduct.DataAssets))
 		for _, asset := range createdProduct.DataAssets {
 			dataAssets = append(dataAssets, DataProductAssetResourceModel{
-				Type: types.StringValue(string(asset.Type)),
+				Type: asset.Type,
 				UUID: types.StringValue(asset.UUID),
+				Project: types.StringValue(asset.Project),
+				Dataset: types.StringValue(asset.Dataset),
+				Table: types.StringValue(asset.Table),
+				AlertType: asset.AlertType,
 			})
 		}
 		data.DataAssets = dataAssets
+	} else {
+		data.DataAssets = []DataProductAssetResourceModel{}
+	}
+
+	// Map data domain
+	data.DataDomain = DataDomainResourceModel{
+		UUID: types.StringValue(createdProduct.Domain.UUID),
+		Name: types.StringValue(createdProduct.Domain.Name),
+		Email: types.StringValue(createdProduct.Domain.Email),
+		SlackChannel: SlackChannelModel{
+			Name: types.StringValue(createdProduct.Domain.SlackChannel.Name),
+			ID: types.StringValue(createdProduct.Domain.SlackChannel.ID),
+		},
 	}
 
 	tflog.Trace(ctx, "created a data product resource")
@@ -182,7 +272,6 @@ func (r *DataProductResource) Read(ctx context.Context, req resource.ReadRequest
 
 	// Map response to model
 	data.Name = types.StringValue(product.Name)
-	data.DataDomainUUID = types.StringValue(product.DataDomainUUID)
 	data.Description = types.StringValue(product.Description)
 
 	// Map data assets
@@ -190,13 +279,28 @@ func (r *DataProductResource) Read(ctx context.Context, req resource.ReadRequest
 		dataAssets := make([]DataProductAssetResourceModel, 0, len(product.DataAssets))
 		for _, asset := range product.DataAssets {
 			dataAssets = append(dataAssets, DataProductAssetResourceModel{
-				Type: types.StringValue(string(asset.Type)),
+				Type: asset.Type,
 				UUID: types.StringValue(asset.UUID),
+				Project: types.StringValue(asset.Project),
+				Dataset: types.StringValue(asset.Dataset),
+				Table: types.StringValue(asset.Table),
+				AlertType: asset.AlertType,
 			})
 		}
 		data.DataAssets = dataAssets
 	} else {
 		data.DataAssets = []DataProductAssetResourceModel{}
+	}
+
+	// Map data domain
+	data.DataDomain = DataDomainResourceModel{
+		UUID: types.StringValue(product.Domain.UUID),
+		Name: types.StringValue(product.Domain.Name),
+		Email: types.StringValue(product.Domain.Email),
+		SlackChannel: SlackChannelModel{
+			Name: types.StringValue(product.Domain.SlackChannel.Name),
+			ID: types.StringValue(product.Domain.SlackChannel.ID),
+		},
 	}
 
 	// Save updated data into Terraform state
@@ -216,7 +320,7 @@ func (r *DataProductResource) Update(ctx context.Context, req resource.UpdateReq
 	product := masthead.DataProduct{
 		UUID:           data.UUID.ValueString(),
 		Name:           data.Name.ValueString(),
-		DataDomainUUID: data.DataDomainUUID.ValueString(),
+		DataDomainUUID: data.DataDomain.UUID.ValueString(),
 		Description:    data.Description.ValueString(),
 	}
 
@@ -225,8 +329,12 @@ func (r *DataProductResource) Update(ctx context.Context, req resource.UpdateReq
 		product.DataAssets = make([]masthead.DataProductAsset, 0, len(data.DataAssets))
 		for _, asset := range data.DataAssets {
 			product.DataAssets = append(product.DataAssets, masthead.DataProductAsset{
-				Type: masthead.DataProductAssetType(asset.Type.ValueString()),
+				Type: asset.Type,
 				UUID: asset.UUID.ValueString(),
+				Project: asset.Project.ValueString(),
+				Dataset: asset.Dataset.ValueString(),
+				Table: asset.Table.ValueString(),
+				AlertType: asset.AlertType,
 			})
 		}
 	}
@@ -239,7 +347,6 @@ func (r *DataProductResource) Update(ctx context.Context, req resource.UpdateReq
 
 	// Map response to model
 	data.Name = types.StringValue(updatedProduct.Name)
-	data.DataDomainUUID = types.StringValue(updatedProduct.DataDomainUUID)
 	data.Description = types.StringValue(updatedProduct.Description)
 
 	// Map data assets
@@ -247,7 +354,7 @@ func (r *DataProductResource) Update(ctx context.Context, req resource.UpdateReq
 		dataAssets := make([]DataProductAssetResourceModel, 0, len(updatedProduct.DataAssets))
 		for _, asset := range updatedProduct.DataAssets {
 			dataAssets = append(dataAssets, DataProductAssetResourceModel{
-				Type: types.StringValue(string(asset.Type)),
+				Type: asset.Type,
 				UUID: types.StringValue(asset.UUID),
 			})
 		}

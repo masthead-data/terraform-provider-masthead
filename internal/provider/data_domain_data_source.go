@@ -23,14 +23,6 @@ type DataDomainDataSource struct {
 	client *masthead.Client
 }
 
-// DataDomainDataSourceModel describes the data source data model.
-type DataDomainDataSourceModel struct {
-	UUID             types.String `tfsdk:"uuid"`
-	Name             types.String `tfsdk:"name"`
-	Email            types.String `tfsdk:"email"`
-	SlackChannelName types.String `tfsdk:"slack_channel_name"`
-}
-
 func (d *DataDomainDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_data_domain"
 }
@@ -51,9 +43,19 @@ func (d *DataDomainDataSource) Schema(ctx context.Context, req datasource.Schema
 				MarkdownDescription: "Email associated with the data domain",
 				Computed:            true,
 			},
-			"slack_channel_name": schema.StringAttribute{
-				MarkdownDescription: "Name of the Slack channel associated with the data domain",
+			"slack_channel": schema.SingleNestedAttribute{
+				MarkdownDescription: "Slack channel associated with the data domain",
 				Computed:            true,
+				Attributes: map[string]schema.Attribute{
+					"name": schema.StringAttribute{
+						MarkdownDescription: "Name of the Slack channel",
+						Computed:            true,
+					},
+					"id": schema.StringAttribute{
+						MarkdownDescription: "ID of the Slack channel",
+						Computed:            true,
+					},
+				},
 			},
 		},
 	}
@@ -78,7 +80,7 @@ func (d *DataDomainDataSource) Configure(ctx context.Context, req datasource.Con
 }
 
 func (d *DataDomainDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data DataDomainDataSourceModel
+	var data DataDomainResourceModel
 
 	// Read Terraform configuration data into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
@@ -96,8 +98,11 @@ func (d *DataDomainDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	// Map response body to model
 	data.Name = types.StringValue(domain.Name)
 	data.Email = types.StringValue(domain.Email)
-	if domain.SlackChannelName != "" {
-		data.SlackChannelName = types.StringValue(domain.SlackChannelName)
+
+	// Check if SlackChannel has valid data using zero value comparison
+	if domain.SlackChannel.ID != "" {
+		data.SlackChannel.Name = types.StringValue(domain.SlackChannel.Name)
+		data.SlackChannel.ID = types.StringValue(domain.SlackChannel.ID)
 	}
 
 	tflog.Debug(ctx, "Read data domain data source", map[string]interface{}{

@@ -1,8 +1,7 @@
 terraform {
   required_providers {
     masthead = {
-      source  = "masthead-data/masthead"
-      version = "0.2.0"
+      source = "masthead-data/masthead"
     }
   }
 }
@@ -18,22 +17,24 @@ provider "masthead" {
 
 resource "masthead_user" "example_user" {
   email = "user@example.com"
-  role  = "OWNER"
+  role  = "USER"
 }
 
 resource "masthead_data_domain" "example_domain" {
-  name               = "Finance Domain"
-  email              = "finance@example.com"
-  slack_channel_name = "#finance-team"
+  name               = "Test Domain"
+  email              = "test@example.com"
+  slack_channel_name = "#10x-infra"
 }
 
 resource "masthead_data_product" "example" {
-  name             = "Analytics Data Product"
+  name             = "Test Data Product"
   data_domain_uuid = masthead_data_domain.example_domain.uuid
   description      = "Product containing company analytics data"
 
-  data_assets {
-    type = "DATASET"
-    uuid = "a123b456-7890-1234-5678-9abcdef01234"
-  }
+  data_assets = [{
+    type    = "TABLE"
+    project = "httparchive"
+    dataset = "crawl"
+    table   = "pages"
+  }]
 }

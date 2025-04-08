@@ -8,8 +8,8 @@ import (
 )
 
 // ListDomains - Returns list of all data domains with pagination support
-func (c *Client) ListDomains() ([]Domain, error) {
-	var allDomains []Domain
+func (c *Client) ListDomains() ([]DataDomain, error) {
+	var allDomains []DataDomain
 	page := 1
 
 	for {
@@ -45,7 +45,7 @@ func (c *Client) ListDomains() ([]Domain, error) {
 }
 
 // CreateDomain - Create a new data domain in the system
-func (c *Client) CreateDomain(domain Domain) (*Domain, error) {
+func (c *Client) CreateDomain(domain DataDomain) (*DataDomain, error) {
 	rb, err := json.Marshal(domain)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (c *Client) CreateDomain(domain Domain) (*Domain, error) {
 }
 
 // GetDomain - Get a specific data domain by ID
-func (c *Client) GetDomain(domainID string) (*Domain, error) {
+func (c *Client) GetDomain(domainID string) (*DataDomain, error) {
 	req, err := http.NewRequest("GET",
 		fmt.Sprintf("%s/clientApi/data-domain/%s", c.HostURL, domainID),
 		nil,
@@ -101,7 +101,7 @@ func (c *Client) GetDomain(domainID string) (*Domain, error) {
 }
 
 // UpdateDomain - Update an existing data domain
-func (c *Client) UpdateDomain(domain Domain) (*Domain, error) {
+func (c *Client) UpdateDomain(domain DataDomain) (*DataDomain, error) {
 	if domain.UUID == "" {
 		return nil, fmt.Errorf("domain UUID cannot be empty")
 	}

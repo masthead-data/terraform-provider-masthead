@@ -3,16 +3,55 @@
 page_title: "masthead Provider"
 subcategory: ""
 description: |-
-
+  
 ---
 
 # masthead Provider
 
+
+
 ## Example Usage
 
 ```terraform
+terraform {
+  required_providers {
+    masthead = {
+      source = "masthead-data/masthead"
+    }
+  }
+}
+
+variable "api_token" {
+  type      = string
+  sensitive = true
+}
+
 provider "masthead" {
-  api_token = "your_api_token"
+  api_token = var.api_token
+}
+
+resource "masthead_user" "example_user" {
+  email = "user@example.com"
+  role  = "USER"
+}
+
+resource "masthead_data_domain" "example_domain" {
+  name               = "Test Domain"
+  email              = "test@example.com"
+  slack_channel_name = "#10x-infra"
+}
+
+resource "masthead_data_product" "example" {
+  name             = "Test Data Product"
+  data_domain_uuid = masthead_data_domain.example_domain.uuid
+  description      = "Product containing company analytics data"
+
+  data_assets = [{
+    type    = "TABLE"
+    project = "httparchive"
+    dataset = "crawl"
+    table   = "pages"
+  }]
 }
 ```
 
@@ -21,4 +60,4 @@ provider "masthead" {
 
 ### Optional
 
-- `api_token` (String, Sensitive) Masthead API Token. This token is used to authenticate with the Masthead API. To obtain a token, log in to your Masthead account and navigate to the **Settings / API Tokens** page. Create a new token and copy it here. Alternatively, you can set the `MASTHEAD_TOKEN` environment variable to use the token from there.
+- `api_token` (String, Sensitive) Masthead API Token. This token is used to authenticate with the Masthead API. To obtain a token, log in to your Masthead account and navigate to the **Settings / API Tokens** page. Create a new token and copy it here. Alternatively, you can set the `MASTHEAD_API_TOKEN` environment variable to use the token from there.

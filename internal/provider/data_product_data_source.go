@@ -25,8 +25,12 @@ type DataProductDataSource struct {
 
 // DataProductAssetModel describes a data asset in the data source model
 type DataProductAssetModel struct {
-	Type types.String `tfsdk:"type"`
-	UUID types.String `tfsdk:"uuid"`
+	Type      masthead.DataProductAssetType `tfsdk:"type"`
+	UUID      types.String                  `tfsdk:"uuid"`
+	Project   types.String                  `tfsdk:"project"`
+	Dataset   types.String                  `tfsdk:"dataset"`
+	Table     types.String                  `tfsdk:"table"`
+	AlertType masthead.AlertType            `tfsdk:"alert_type"`
 }
 
 // DataProductDataSourceModel describes the data source data model.
@@ -35,6 +39,7 @@ type DataProductDataSourceModel struct {
 	Name           types.String            `tfsdk:"name"`
 	Description    types.String            `tfsdk:"description"`
 	DataDomainUUID types.String            `tfsdk:"data_domain_uuid"`
+	Domain         DataDomainResourceModel `tfsdk:"domain"`
 	DataAssets     []DataProductAssetModel `tfsdk:"data_assets"`
 }
 
@@ -62,6 +67,38 @@ func (d *DataProductDataSource) Schema(ctx context.Context, req datasource.Schem
 				MarkdownDescription: "UUID of the data domain this product belongs to",
 				Computed:            true,
 			},
+			"domain": schema.SingleNestedAttribute{
+				MarkdownDescription: "Data domain associated with this data product",
+				Computed:            true,
+				Attributes: map[string]schema.Attribute{
+					"uuid": schema.StringAttribute{
+						MarkdownDescription: "UUID of the data domain",
+						Computed:            true,
+					},
+					"name": schema.StringAttribute{
+						MarkdownDescription: "Name of the data domain",
+						Computed:            true,
+					},
+					"email": schema.StringAttribute{
+						MarkdownDescription: "Email associated with the data domain",
+						Computed:            true,
+					},
+					"slack_channel": schema.SingleNestedAttribute{
+						MarkdownDescription: "Slack channel associated with the data domain",
+						Computed:            true,
+						Attributes: map[string]schema.Attribute{
+							"name": schema.StringAttribute{
+								MarkdownDescription: "Name of the Slack channel",
+								Computed:            true,
+							},
+							"id": schema.StringAttribute{
+								MarkdownDescription: "ID of the Slack channel",
+								Computed:            true,
+							},
+						},
+					},
+				},
+			},
 			"data_assets": schema.ListNestedAttribute{
 				MarkdownDescription: "List of data assets associated with this data product",
 				Computed:            true,
@@ -73,6 +110,22 @@ func (d *DataProductDataSource) Schema(ctx context.Context, req datasource.Schem
 						},
 						"uuid": schema.StringAttribute{
 							MarkdownDescription: "UUID of the data asset",
+							Computed:            true,
+						},
+						"project": schema.StringAttribute{
+							MarkdownDescription: "Project of the data asset",
+							Computed:            true,
+						},
+						"dataset": schema.StringAttribute{
+							MarkdownDescription: "Dataset of the data asset",
+							Computed:            true,
+						},
+						"table": schema.StringAttribute{
+							MarkdownDescription: "Table of the data asset",
+							Computed:            true,
+						},
+						"alert_type": schema.StringAttribute{
+							MarkdownDescription: "Alert type of the data asset (e.g., DATASET, TABLE)",
 							Computed:            true,
 						},
 					},
@@ -125,11 +178,26 @@ func (d *DataProductDataSource) Read(ctx context.Context, req datasource.ReadReq
 	dataAssets := make([]DataProductAssetModel, 0, len(product.DataAssets))
 	for _, asset := range product.DataAssets {
 		dataAssets = append(dataAssets, DataProductAssetModel{
-			Type: types.StringValue(string(asset.Type)),
+			Type: asset.Type,
 			UUID: types.StringValue(asset.UUID),
+			Project: types.StringValue(asset.Project),
+			Dataset: types.StringValue(asset.Dataset),
+			Table: types.StringValue(asset.Table),
+			AlertType: asset.AlertType,
 		})
 	}
 	data.DataAssets = dataAssets
+
+
+	data.Domain = DataDomainResourceModel{
+		UUID: types.StringValue(product.Domain.UUID),
+		Name: types.StringValue(product.Domain.Name),
+		Email: types.StringValue(product.Domain.Email),
+		SlackChannel: SlackChannelModel{
+			Name: types.StringValue(product.Domain.SlackChannel.Name),
+			ID: types.StringValue(product.Domain.SlackChannel.ID),
+		},
+	}
 
 	tflog.Debug(ctx, "Read data product data source", map[string]interface{}{
 		"uuid": data.UUID.ValueString(),

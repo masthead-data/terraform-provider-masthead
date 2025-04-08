@@ -69,7 +69,7 @@ func apiClientExample(client *Client, t *testing.T) {
 	// domainExample demonstrates the Data Domain API operations
 
 	// Sample data for creating a data domain
-	testDomain := Domain{
+	testDomain := DataDomain{
 		Name:             "API Test Domain",
 		Email:            "domain@example.com",
 		SlackChannelName: "10x-infra",

@@ -9,51 +9,56 @@ This repository is a [Terraform](https://www.terraform.io) provider for Masthead
 
 ## Developing the Provider
 
-If you wish to work on the provider, you'll first need [Go](http://www.golang.org) installed on your machine (see [Requirements](#requirements) above).
+1. Build the provider:
 
-To update the dependencies and build the provider, run:
     ```shell
     go mod tidy
     go install
     ```
 
-This will put the provider binary in the `$GOPATH/bin` directory.
+    This will put the provider binary in the `$GOPATH/bin` directory.
 
-To generate or update documentation, run `make generate`.
+2. Update the documentation:
 
-In order to run the full suite of Acceptance tests, run `make testacc`.
+   ```shell
+   make generate
+   ```
 
-*Note:* Acceptance tests create real resources, and often cost money to run.
+3. Add the following block to your Terraform configuration in `~/.terraformrc` to use the provider from your local development environment:
+
+    ```hcl
+    provider_installation {
+    dev_overrides {
+        "hashicorp.com/edu/hashicups" = "<PATH>"
+    }
+    # For all other providers, install them directly from their origin provider
+    # registries as normal. If you omit this, Terraform will _only_ use
+    # the dev_overrides block, and so no other providers will be available.
+    direct {}
+    }
+    ```
+
+4. Run the test resources deployment:
+
+   ```shell
+   terraform -chdir=examples/provider init
+   terraform -chdir=examples/provider plan -var api_token=YOUR_API_TOKEN
+   ```
 
 ## Developing the GO client
 
 For local developement of the Masthead Data client library, you can use the following steps to set up your environment:
 
-1. Adjust the `go.mod` file to point to the local version of the Masthead Data client library. This is done by replacing the `masthead` module with a local path. Use the `replace` directive in your `go.mod` file to point to the local path of the Masthead Data client library.
-
-    ```go
-    require masthead v0.0.0
-    replace masthead => ../../internal/client
-    ```
-
-2. Import the local version of the Masthead Data client library in your code.
-
-    ```go
-    import (
-        ...
-        "masthead"
-    )
-    ```
-
-3. Build the client by running:
+1. Build the client by running:
 
     ```shell
     go mod tidy
     go install
     ```
 
-to ensure that all dependencies are correctly resolved and build the API client with the updated client libraries.
-4. Run `make testacc` to run the acceptance tests with the local client library.
+2. Run `make testacc` to run the acceptance tests.
+
+    *Note:* Acceptance tests create real resources.
 
 ## Contributing
 

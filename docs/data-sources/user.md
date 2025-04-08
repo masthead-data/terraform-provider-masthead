@@ -21,4 +21,5 @@ Fetch information about a Masthead user
 
 ### Read-Only
 
+- `id` (String) Unique identifier for the user.
 - `role` (String) Role of the user (e.g., admin, user)

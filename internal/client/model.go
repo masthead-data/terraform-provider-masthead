@@ -17,7 +17,7 @@ type SlackChannel struct {
 }
 
 // Domain represents a data domain in the system
-type Domain struct {
+type DataDomain struct {
 	UUID             string       `json:"uuid"`
 	Name             string       `json:"name"`
 	Email            string       `json:"email"`
@@ -29,14 +29,14 @@ type Domain struct {
 
 // DomainResponse represents the response from the create/update domain API
 type DomainResponse struct {
-	Value   Domain `json:"value"`
+	Value   DataDomain `json:"value"`
 	Error   error  `json:"error,omitempty"`
 	Message string `json:"message,omitempty"`
 }
 
 // DomainsResponse represents the response from the list domains API
 type DomainListResponse struct {
-	Values     []Domain    `json:"values"`
+	Values     []DataDomain    `json:"values"`
 	Pagination Pagination  `json:"pagination"`
 	Extra      interface{} `json:"extra,omitempty"`
 	Error      error       `json:"error,omitempty"`
@@ -72,7 +72,7 @@ type DataProduct struct {
 	Name           string             `json:"name"`
 	DataDomainUUID string             `json:"dataDomainUuid,omitempty"`
 	Description    string             `json:"description"`
-	Domain         *Domain            `json:"domain"`
+	Domain         *DataDomain            `json:"domain"`
 	CreatedAt      time.Time          `json:"createdAt,omitempty"`
 	UpdatedAt      time.Time          `json:"updatedAt,omitempty"`
 	DataAssets     []DataProductAsset `json:"dataAssets"`
