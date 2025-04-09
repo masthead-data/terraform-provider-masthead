@@ -3,7 +3,7 @@
 page_title: "masthead Provider"
 subcategory: ""
 description: |-
-  
+
 ---
 
 # masthead Provider
@@ -36,15 +36,19 @@ resource "masthead_user" "example_user" {
 }
 
 resource "masthead_data_domain" "example_domain" {
-  name               = "Test Domain"
-  email              = "test@example.com"
-  slack_channel_name = "#10x-infra"
+  name  = "Test Domain"
+  email = "test@example.com"
+  slack_channel = {
+    name = "10x-infra"
+  }
 }
 
 resource "masthead_data_product" "example" {
-  name             = "Test Data Product"
-  data_domain_uuid = masthead_data_domain.example_domain.uuid
-  description      = "Product containing company analytics data"
+  name        = "Test Data Product"
+  description = "Product containing company analytics data"
+  domain = {
+    uuid = masthead_data_domain.example_domain.uuid
+  }
 
   data_assets = [{
     type    = "TABLE"

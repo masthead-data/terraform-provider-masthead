@@ -62,17 +62,14 @@ func (r *DataDomainResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "Email associated with the data domain",
 				Required:            true,
 			},
-			"slack_channel_name": schema.StringAttribute{
-				MarkdownDescription: "Name of the Slack channel associated with the data domain",
-				Optional:            true,
-			},
 			"slack_channel": schema.SingleNestedAttribute{
 				MarkdownDescription: "Slack channel associated with the data domain",
+				Optional:            true,
 				Computed:            true,
 				Attributes: map[string]schema.Attribute{
 					"name": schema.StringAttribute{
 						MarkdownDescription: "Name of the Slack channel",
-						Computed:            true,
+						Required:            true,
 					},
 					"id": schema.StringAttribute{
 						MarkdownDescription: "ID of the Slack channel",

@@ -9,7 +9,7 @@ import (
 
 // ListDomains - Returns list of all data domains with pagination support
 func (c *Client) ListDomains() ([]DataDomain, error) {
-	var allDomains []DataDomain
+	var allDataDomains []DataDomain
 	page := 1
 
 	for {
@@ -24,29 +24,29 @@ func (c *Client) ListDomains() ([]DataDomain, error) {
 			return nil, err
 		}
 
-		domainsResponse := DomainListResponse{}
-		err = json.Unmarshal(body, &domainsResponse)
+		dataDomainsResponse := DomainListResponse{}
+		err = json.Unmarshal(body, &dataDomainsResponse)
 		if err != nil {
 			return nil, err
-		} else if domainsResponse.Error != nil {
-			return nil, fmt.Errorf("error: %v. %v", domainsResponse.Error, domainsResponse.Message)
+		} else if dataDomainsResponse.Error != nil {
+			return nil, fmt.Errorf("error: %v. %v", dataDomainsResponse.Error, dataDomainsResponse.Message)
 		}
 
-		allDomains = append(allDomains, domainsResponse.Values...)
+		allDataDomains = append(allDataDomains, dataDomainsResponse.DataDomains...)
 
 		// Break if we've retrieved all pages
-		if len(domainsResponse.Values) == 0 || len(allDomains) >= domainsResponse.Pagination.Total {
+		if len(dataDomainsResponse.DataDomains) == 0 || len(allDataDomains) >= dataDomainsResponse.Pagination.Total {
 			break
 		}
 		page++
 	}
 
-	return allDomains, nil
+	return allDataDomains, nil
 }
 
 // CreateDomain - Create a new data domain in the system
-func (c *Client) CreateDomain(domain DataDomain) (*DataDomain, error) {
-	rb, err := json.Marshal(domain)
+func (c *Client) CreateDomain(dataDomain DataDomain) (*DataDomain, error) {
+	rb, err := json.Marshal(dataDomain)
 	if err != nil {
 		return nil, err
 	}
@@ -63,21 +63,21 @@ func (c *Client) CreateDomain(domain DataDomain) (*DataDomain, error) {
 		return nil, err
 	}
 
-	domainResponse := DomainResponse{}
-	err = json.Unmarshal(body, &domainResponse)
+	dataDomainResponse := DomainResponse{}
+	err = json.Unmarshal(body, &dataDomainResponse)
 	if err != nil {
 		return nil, err
-	} else if domainResponse.Error != nil {
-		return nil, fmt.Errorf("error: %v. %v", domainResponse.Error, domainResponse.Message)
+	} else if dataDomainResponse.Error != nil {
+		return nil, fmt.Errorf("error: %v. %v", dataDomainResponse.Error, dataDomainResponse.Message)
 	}
 
-	return &domainResponse.Value, nil
+	return &dataDomainResponse.DataDomain, nil
 }
 
 // GetDomain - Get a specific data domain by ID
-func (c *Client) GetDomain(domainID string) (*DataDomain, error) {
+func (c *Client) GetDomain(dataDomainID string) (*DataDomain, error) {
 	req, err := http.NewRequest("GET",
-		fmt.Sprintf("%s/clientApi/data-domain/%s", c.HostURL, domainID),
+		fmt.Sprintf("%s/clientApi/data-domain/%s", c.HostURL, dataDomainID),
 		nil,
 	)
 	if err != nil {
@@ -89,29 +89,29 @@ func (c *Client) GetDomain(domainID string) (*DataDomain, error) {
 		return nil, err
 	}
 
-	domainResponse := DomainResponse{}
-	err = json.Unmarshal(body, &domainResponse)
+	dataDomainResponse := DomainResponse{}
+	err = json.Unmarshal(body, &dataDomainResponse)
 	if err != nil {
 		return nil, err
-	} else if domainResponse.Error != nil {
-		return nil, fmt.Errorf("error: %v. %v", domainResponse.Error, domainResponse.Message)
+	} else if dataDomainResponse.Error != nil {
+		return nil, fmt.Errorf("error: %v. %v", dataDomainResponse.Error, dataDomainResponse.Message)
 	}
 
-	return &domainResponse.Value, nil
+	return &dataDomainResponse.DataDomain, nil
 }
 
 // UpdateDomain - Update an existing data domain
-func (c *Client) UpdateDomain(domain DataDomain) (*DataDomain, error) {
-	if domain.UUID == "" {
+func (c *Client) UpdateDomain(dataDomain DataDomain) (*DataDomain, error) {
+	if dataDomain.UUID == "" {
 		return nil, fmt.Errorf("domain UUID cannot be empty")
 	}
-	rb, err := json.Marshal(domain)
+	rb, err := json.Marshal(dataDomain)
 	if err != nil {
 		return nil, err
 	}
 
 	req, err := http.NewRequest("PUT",
-		fmt.Sprintf("%s/clientApi/data-domain/%s", c.HostURL, domain.UUID),
+		fmt.Sprintf("%s/clientApi/data-domain/%s", c.HostURL, dataDomain.UUID),
 		strings.NewReader(string(rb)),
 	)
 	if err != nil {
@@ -132,7 +132,7 @@ func (c *Client) UpdateDomain(domain DataDomain) (*DataDomain, error) {
 		return nil, fmt.Errorf("error: %v. %v", domainResponse.Error, domainResponse.Message)
 	}
 
-	return &domainResponse.Value, nil
+	return &domainResponse.DataDomain, nil
 }
 
 // DeleteDomain - Remove a data domain from the system by ID

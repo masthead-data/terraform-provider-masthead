@@ -178,24 +178,23 @@ func (d *DataProductDataSource) Read(ctx context.Context, req datasource.ReadReq
 	dataAssets := make([]DataProductAssetModel, 0, len(product.DataAssets))
 	for _, asset := range product.DataAssets {
 		dataAssets = append(dataAssets, DataProductAssetModel{
-			Type: asset.Type,
-			UUID: types.StringValue(asset.UUID),
-			Project: types.StringValue(asset.Project),
-			Dataset: types.StringValue(asset.Dataset),
-			Table: types.StringValue(asset.Table),
+			Type:      asset.Type,
+			UUID:      types.StringValue(asset.UUID),
+			Project:   types.StringValue(asset.Project),
+			Dataset:   types.StringValue(asset.Dataset),
+			Table:     types.StringValue(asset.Table),
 			AlertType: asset.AlertType,
 		})
 	}
 	data.DataAssets = dataAssets
 
-
 	data.Domain = DataDomainResourceModel{
-		UUID: types.StringValue(product.Domain.UUID),
-		Name: types.StringValue(product.Domain.Name),
-		Email: types.StringValue(product.Domain.Email),
+		UUID:  types.StringValue(product.DataDomain.UUID),
+		Name:  types.StringValue(product.DataDomain.Name),
+		Email: types.StringValue(product.DataDomain.Email),
 		SlackChannel: SlackChannelModel{
-			Name: types.StringValue(product.Domain.SlackChannel.Name),
-			ID: types.StringValue(product.Domain.SlackChannel.ID),
+			Name: types.StringValue(product.DataDomain.SlackChannel.Name),
+			ID:   types.StringValue(product.DataDomain.SlackChannel.ID),
 		},
 	}
 

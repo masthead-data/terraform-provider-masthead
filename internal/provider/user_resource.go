@@ -29,8 +29,8 @@ type UserResource struct {
 
 // UserResourceModel describes the resource data model.
 type UserResourceModel struct {
-	Email types.String `tfsdk:"email"`
-	Role  types.String `tfsdk:"role"`
+	Email types.String      `tfsdk:"email"`
+	Role  masthead.UserRole `tfsdk:"role"`
 }
 
 func (r *UserResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -86,7 +86,7 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 	// Create user object
 	user := masthead.User{
 		Email: data.Email.ValueString(),
-		Role:  data.Role.ValueString(),
+		Role:  data.Role,
 	}
 
 	// Create new user
@@ -100,8 +100,12 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 	// For Masthead users, email is the unique identifier
 	tflog.Trace(ctx, "created a user resource")
 
+	// Map API response to model
+	data.Email = types.StringValue(createdUser.Email)
+	data.Role = createdUser.Role
+
 	// Save data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &createdUser)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
 func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -124,7 +128,7 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	found := false
 	for _, user := range users {
 		if user.Email == data.Email.ValueString() {
-			data.Role = types.StringValue(user.Role)
+			data.Role = user.Role
 			found = true
 			break
 		}
@@ -151,7 +155,7 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	user := masthead.User{
 		Email: data.Email.ValueString(),
-		Role:  data.Role.ValueString(),
+		Role:  data.Role,
 	}
 
 	updatedUser, err := r.client.UpdateUserRole(user)
@@ -160,10 +164,13 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
-	tflog.Trace(ctx, "updated a user resource")
+	// Map API response to model
+	data.Email = types.StringValue(updatedUser.Email)
+	data.Role = updatedUser.Role
 
 	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &updatedUser)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	tflog.Trace(ctx, "updated a user resource")
 }
 
 func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

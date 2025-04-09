@@ -25,9 +25,9 @@ type UserDataSource struct {
 
 // UserDataSourceModel describes the data source data model.
 type UserDataSourceModel struct {
-	Id    types.String `tfsdk:"id"`
-	Email types.String `tfsdk:"email"`
-	Role  types.String `tfsdk:"role"`
+	Id    types.String      `tfsdk:"id"`
+	Email types.String      `tfsdk:"email"`
+	Role  masthead.UserRole `tfsdk:"role"`
 }
 
 func (d *UserDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -92,7 +92,7 @@ func (d *UserDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	found := false
 	for _, user := range users {
 		if user.Email == data.Email.ValueString() {
-			data.Role = types.StringValue(user.Role)
+			data.Role = user.Role
 			found = true
 			break
 		}

@@ -33,7 +33,7 @@ func (c *Client) ListDataProducts() ([]DataProduct, error) {
 			return nil, fmt.Errorf("error: %v. %v", productsResponse.Error, productsResponse.Message)
 		}
 
-		allProducts = append(allProducts, productsResponse.Values...)
+		allProducts = append(allProducts, productsResponse.DataProducts...)
 
 		// Check if we've fetched all pages
 		totalItems := productsResponse.Pagination.Total
@@ -76,7 +76,7 @@ func (c *Client) CreateDataProduct(dataProduct DataProduct) (*DataProduct, error
 		return nil, fmt.Errorf("error: %v. %v", productResponse.Error, productResponse.Message)
 	}
 
-	return &productResponse.Value, nil
+	return &productResponse.DataProduct, nil
 }
 
 // GetDataProduct - Get a specific data product by ID
@@ -101,7 +101,7 @@ func (c *Client) GetDataProduct(productID string) (*DataProduct, error) {
 		return nil, err
 	}
 
-	return &productResponse.Value, nil
+	return &productResponse.DataProduct, nil
 }
 
 // UpdateDataProduct - Update an existing data product
@@ -131,7 +131,7 @@ func (c *Client) UpdateDataProduct(dataProduct DataProduct) (*DataProduct, error
 		return nil, err
 	}
 
-	return &productResponse.Value, nil
+	return &productResponse.DataProduct, nil
 }
 
 // DeleteDataProduct - Remove a data product from the system by ID

@@ -14,14 +14,12 @@ const HostURL string = "https://metadata.mastheadata.com"
 // TokenEnvVar - Environment variable for the Masthead API token
 const TokenEnvVar string = "MASTHEAD_API_TOKEN"
 
-// Client -
 type Client struct {
 	HostURL    string
 	HTTPClient *http.Client
 	Token      string
 }
 
-// NewClient -
 func NewClient(token *string) (*Client, error) {
 	c := Client{
 		HTTPClient: &http.Client{Timeout: 10 * time.Second},
@@ -83,24 +81,4 @@ func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 	}
 
 	return body, err
-}
-
-// User represents a user in the system
-type User struct {
-	Email string `json:"email"`
-	Role  string `json:"role"` // Role can be "OWNER" or "USER"
-}
-
-// UserResponse represents the response from the create/update user API
-type UserResponse struct {
-	User  User        `json:"value"`
-	Extra interface{} `json:"extra"`
-	Error interface{} `json:"error"`
-}
-
-// UsersResponse represents the response from the list users API
-type UsersResponse struct {
-	Users []User      `json:"values"`
-	Extra interface{} `json:"extra"`
-	Error interface{} `json:"error"`
 }

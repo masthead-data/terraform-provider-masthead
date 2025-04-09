@@ -18,7 +18,6 @@ func TestClient(t *testing.T) {
 	apiClient, err := NewClient(&apiToken)
 	assert.NoError(t, err, "Client creation should not return an error")
 
-
 	t.Log("Masthead API client created successfully")
 
 	// Call the example function to demonstrate API operations
@@ -105,6 +104,7 @@ func apiClientExample(client *Client, t *testing.T) {
 
 		// Update the data domain
 		testDomain.Name = testDomain.Name + " (Updated)"
+		testDomain.SlackChannelName = ""
 		domain, err = client.UpdateDomain(testDomain)
 		assert.NoError(t, err, "Data domain update should not return an error")
 		if err == nil {
@@ -116,12 +116,12 @@ func apiClientExample(client *Client, t *testing.T) {
 	// Sample data assets
 	dataAssets := []DataProductAsset{
 		{
-			Type: DataProductAssetTypeDataset,
+			Type:    DataProductAssetTypeDataset,
 			Project: "httparchive",
 			Dataset: "scratchspace",
 		},
 		{
-			Type: DataProductAssetTypeTable,
+			Type:    DataProductAssetTypeTable,
 			Project: "httparchive",
 			Dataset: "crawl",
 			Table:   "pages",
@@ -180,7 +180,7 @@ func apiClientExample(client *Client, t *testing.T) {
 
 		// Add an additional data asset for the update
 		testProduct.DataAssets = append(testProduct.DataAssets, DataProductAsset{
-			Type: DataProductAssetTypeTable,
+			Type:    DataProductAssetTypeTable,
 			Project: "httparchive",
 			Dataset: "sample_data",
 			Table:   "pages_10k",
