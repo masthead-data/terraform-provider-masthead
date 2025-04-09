@@ -3,8 +3,6 @@ default: fmt lint install generate
 clean:
 	rm -rf examples/provider/.terraform
 	rm -rf examples/provider/.terraform.lock.hcl
-	rm -rf examples/provider/terraform.tfstate
-	rm -rf examples/provider/terraform.tfstate.backup
 
 build:
 	go build -v ./...
@@ -27,6 +25,7 @@ test:
 	go install .
 	go test -v -cover -timeout=120s -parallel=10 ./...
 	terraform -chdir=examples/provider init
+	export TF_LOG="DEBUG"
 	terraform -chdir=examples/provider apply -auto-approve
 
 testacc:

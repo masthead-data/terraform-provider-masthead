@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	masthead "github.com/masthead-data/terraform-provider-masthead/internal/client"
 )
 
@@ -41,8 +40,8 @@ type DataProductAssetResourceModel struct {
 type DataProductResourceModel struct {
 	UUID           types.String                    `tfsdk:"uuid"`
 	Name           types.String                    `tfsdk:"name"`
-	DataDomain     DataDomainResourceModel         `tfsdk:"domain"`
 	Description    types.String                    `tfsdk:"description"`
+	DataDomainUUID types.String                    `tfsdk:"data_domain_uuid"`
 	DataAssets     []DataProductAssetResourceModel `tfsdk:"data_assets"`
 }
 
@@ -65,50 +64,9 @@ func (r *DataProductResource) Schema(ctx context.Context, req resource.SchemaReq
 				MarkdownDescription: "Name of the data product",
 				Required:            true,
 			},
-			"domain": schema.SingleNestedAttribute{
-				MarkdownDescription: "Data domain associated with this data product",
+			"data_domain_uuid": schema.StringAttribute{
+				MarkdownDescription: "UUID of the data domain this product belongs to",
 				Optional:            true,
-				Attributes: map[string]schema.Attribute{
-					"uuid": schema.StringAttribute{
-						MarkdownDescription: "UUID of the data domain",
-						Required:            true,
-					},
-					"name": schema.StringAttribute{
-						MarkdownDescription: "Name of the data domain",
-						Computed:            true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
-					},
-					"email": schema.StringAttribute{
-						MarkdownDescription: "Email associated with the data domain",
-						Computed:            true,
-						PlanModifiers: []planmodifier.String{
-							stringplanmodifier.UseStateForUnknown(),
-						},
-					},
-					"slack_channel": schema.SingleNestedAttribute{
-						MarkdownDescription: "Slack channel associated with the data domain",
-						Optional:            true,
-						Computed:            true,
-						Attributes: map[string]schema.Attribute{
-							"name": schema.StringAttribute{
-								MarkdownDescription: "Name of the Slack channel",
-								Computed:            true,
-								PlanModifiers: []planmodifier.String{
-									stringplanmodifier.UseStateForUnknown(),
-								},
-							},
-							"id": schema.StringAttribute{
-								MarkdownDescription: "ID of the Slack channel",
-								Computed:            true,
-								PlanModifiers: []planmodifier.String{
-									stringplanmodifier.UseStateForUnknown(),
-								},
-							},
-						},
-					},
-				},
 			},
 			"description": schema.StringAttribute{
 				MarkdownDescription: "Description of the data product",
@@ -125,27 +83,22 @@ func (r *DataProductResource) Schema(ctx context.Context, req resource.SchemaReq
 						},
 						"uuid": schema.StringAttribute{
 							MarkdownDescription: "UUID of the data asset",
-							Required:            false,
 							Computed:            true,
 						},
 						"project": schema.StringAttribute{
 							MarkdownDescription: "Project associated with the data asset",
-							Optional:            true,
-							Computed:            true,
+							Required:            true,
 						},
 						"dataset": schema.StringAttribute{
 							MarkdownDescription: "Dataset associated with the data asset",
-							Optional:            true,
-							Computed:            true,
+							Required:            true,
 						},
 						"table": schema.StringAttribute{
 							MarkdownDescription: "Table associated with the data asset",
 							Optional:            true,
-							Computed:            true,
 						},
 						"alert_type": schema.StringAttribute{
 							MarkdownDescription: "Alert type associated with the data asset",
-							Optional:            true,
 							Computed:            true,
 						},
 					},
@@ -174,26 +127,28 @@ func (r *DataProductResource) Configure(ctx context.Context, req resource.Config
 }
 
 func (r *DataProductResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data DataProductResourceModel
+	var plan DataProductResourceModel
+	var state DataProductResourceModel
 
 	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Create new data product
-	product := masthead.DataProduct{
-		Name:           data.Name.ValueString(),
-		DataDomainUUID: data.DataDomain.UUID.ValueString(),
-		Description:    data.Description.ValueString(),
+	productRequest := masthead.DataProduct{
+		Name:           plan.Name.ValueString(),
+		Description:    plan.Description.ValueString(),
+		DataDomainUUID: plan.DataDomainUUID.ValueString(),
 	}
 
 	// Add data assets if specified
-	if len(data.DataAssets) > 0 {
-		product.DataAssets = make([]masthead.DataProductAsset, 0, len(data.DataAssets))
-		for _, asset := range data.DataAssets {
-			product.DataAssets = append(product.DataAssets, masthead.DataProductAsset{
+	if len(plan.DataAssets) > 0 {
+		productRequest.DataAssets = make([]masthead.DataProductAsset, 0, len(plan.DataAssets))
+		for _, asset := range plan.DataAssets {
+			productRequest.DataAssets = append(productRequest.DataAssets, masthead.DataProductAsset{
+				Type:    asset.Type,
 				UUID:    asset.UUID.ValueString(),
 				Project: asset.Project.ValueString(),
 				Dataset: asset.Dataset.ValueString(),
@@ -202,76 +157,90 @@ func (r *DataProductResource) Create(ctx context.Context, req resource.CreateReq
 		}
 	}
 
-	createdProduct, err := r.client.CreateDataProduct(product)
+	productResponse, err := r.client.CreateDataProduct(productRequest)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create data product, got error: %s", err))
 		return
 	}
 
 	// Map response to model
-	data.UUID = types.StringValue(createdProduct.UUID)
-	data.Name = types.StringValue(createdProduct.Name)
-	data.Description = types.StringValue(createdProduct.Description)
+	state.UUID = types.StringValue(productResponse.UUID)
+	state.Name = types.StringValue(productResponse.Name)
+	if productResponse.Description == "" {
+		state.Description = types.StringNull()
+	} else {
+		state.Description = types.StringValue(productResponse.Description)
+	}
+	if productResponse.DataDomain != nil {
+		state.DataDomainUUID = types.StringValue(productResponse.DataDomain.UUID)
+	} else {
+		state.DataDomainUUID = types.StringNull()
+	}
 
 	// Map data assets
-	if len(createdProduct.DataAssets) > 0 {
-		DataAssets := make([]DataProductAssetResourceModel, 0, len(createdProduct.DataAssets))
-		for _, asset := range createdProduct.DataAssets {
-			DataAssets = append(DataAssets, DataProductAssetResourceModel{
-				Type:      asset.Type,
-				UUID:      types.StringValue(asset.UUID),
-				Project:   types.StringValue(asset.Project),
-				Dataset:   types.StringValue(asset.Dataset),
-				Table:     types.StringValue(asset.Table),
-				AlertType: types.StringValue(string(asset.AlertType)),
-			})
+	if len(productResponse.DataAssets) > 0 {
+		dataAssets := make([]DataProductAssetResourceModel, 0, len(productResponse.DataAssets))
+		for _, asset := range productResponse.DataAssets {
+			var mappedAsset DataProductAssetResourceModel
+			mappedAsset.Type = asset.Type
+			mappedAsset.UUID = types.StringValue(asset.UUID)
+			mappedAsset.Project = types.StringValue(asset.Project)
+			mappedAsset.Dataset = types.StringValue(asset.Dataset)
+			mappedAsset.Table = types.StringValue(asset.Table)
+			if asset.Table == "" {
+				mappedAsset.Table = types.StringNull()
+			} else {
+				mappedAsset.Table = types.StringValue(asset.Table)
+			}
+			mappedAsset.AlertType = types.StringValue(string(asset.AlertType))
+
+			// Add the mapped asset to the list
+			dataAssets = append(dataAssets, mappedAsset)
 		}
-		data.DataAssets = DataAssets
+		state.DataAssets = dataAssets
 	} else {
-		data.DataAssets = []DataProductAssetResourceModel{}
+		state.DataAssets = []DataProductAssetResourceModel{}
 	}
-
-	// Map data domain
-	data.DataDomain = DataDomainResourceModel{
-		UUID:  types.StringValue(createdProduct.DataDomain.UUID),
-		Name:  types.StringValue(createdProduct.DataDomain.Name),
-		Email: types.StringValue(createdProduct.DataDomain.Email),
-		SlackChannel: SlackChannelModel{
-			Name: types.StringValue(createdProduct.DataDomain.SlackChannel.Name),
-			ID:   types.StringValue(createdProduct.DataDomain.SlackChannel.ID),
-		},
-	}
-
-	tflog.Trace(ctx, "created a data product resource")
 
 	// Save data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *DataProductResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data DataProductResourceModel
+	var plan DataProductResourceModel
+	var state DataProductResourceModel
 
 	// Read Terraform prior state data into the model
-	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Get data product by UUID
-	product, err := r.client.GetDataProduct(data.UUID.ValueString())
+	productResponse, err := r.client.GetDataProduct(plan.UUID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read data product, got error: %s", err))
 		return
 	}
 
 	// Map response to model
-	data.Name = types.StringValue(product.Name)
-	data.Description = types.StringValue(product.Description)
+	state.UUID = types.StringValue(productResponse.UUID)
+	state.Name = types.StringValue(productResponse.Name)
+	if productResponse.Description == "" {
+		state.Description = types.StringNull()
+	} else {
+		state.Description = types.StringValue(productResponse.Description)
+	}
+	if productResponse.DataDomain != nil {
+		state.DataDomainUUID = types.StringValue(productResponse.DataDomain.UUID)
+	} else {
+		state.DataDomainUUID = types.StringNull()
+	}
 
 	// Map data assets
-	if len(product.DataAssets) > 0 {
-		dataAssets := make([]DataProductAssetResourceModel, 0, len(product.DataAssets))
-		for _, asset := range product.DataAssets {
+	if len(productResponse.DataAssets) > 0 {
+		dataAssets := make([]DataProductAssetResourceModel, 0, len(productResponse.DataAssets))
+		for _, asset := range productResponse.DataAssets {
 			dataAssets = append(dataAssets, DataProductAssetResourceModel{
 				Type:      asset.Type,
 				UUID:      types.StringValue(asset.UUID),
@@ -281,48 +250,38 @@ func (r *DataProductResource) Read(ctx context.Context, req resource.ReadRequest
 				AlertType: types.StringValue(string(asset.AlertType)),
 			})
 		}
-		data.DataAssets = dataAssets
+		state.DataAssets = dataAssets
 	} else {
-		data.DataAssets = []DataProductAssetResourceModel{}
-	}
-
-	// Map data domain
-	data.DataDomain = DataDomainResourceModel{
-		UUID:  types.StringValue(product.DataDomain.UUID),
-		Name:  types.StringValue(product.DataDomain.Name),
-		Email: types.StringValue(product.DataDomain.Email),
-		SlackChannel: SlackChannelModel{
-			Name: types.StringValue(product.DataDomain.SlackChannel.Name),
-			ID:   types.StringValue(product.DataDomain.SlackChannel.ID),
-		},
+		state.DataAssets = []DataProductAssetResourceModel{}
 	}
 
 	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *DataProductResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data DataProductResourceModel
+	var plan DataProductResourceModel
+	var state DataProductResourceModel
 
 	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Update existing data product
-	product := masthead.DataProduct{
-		UUID:           data.UUID.ValueString(),
-		Name:           data.Name.ValueString(),
-		DataDomainUUID: data.DataDomain.UUID.ValueString(),
-		Description:    data.Description.ValueString(),
+	productRequest := masthead.DataProduct{
+		UUID:           plan.UUID.ValueString(),
+		Name:           plan.Name.ValueString(),
+		DataDomainUUID: plan.DataDomainUUID.ValueString(),
+		Description:    plan.Description.ValueString(),
 	}
 
 	// Add data assets if specified
-	if len(data.DataAssets) > 0 {
-		product.DataAssets = make([]masthead.DataProductAsset, 0, len(data.DataAssets))
-		for _, asset := range data.DataAssets {
-			product.DataAssets = append(product.DataAssets, masthead.DataProductAsset{
+	if len(plan.DataAssets) > 0 {
+		productRequest.DataAssets = make([]masthead.DataProductAsset, 0, len(plan.DataAssets))
+		for _, asset := range plan.DataAssets {
+			productRequest.DataAssets = append(productRequest.DataAssets, masthead.DataProductAsset{
 				Type:      asset.Type,
 				UUID:      asset.UUID.ValueString(),
 				Project:   asset.Project.ValueString(),
@@ -333,53 +292,70 @@ func (r *DataProductResource) Update(ctx context.Context, req resource.UpdateReq
 		}
 	}
 
-	updatedProduct, err := r.client.UpdateDataProduct(product)
+	productResponse, err := r.client.UpdateDataProduct(productRequest)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update data product, got error: %s", err))
 		return
 	}
 
 	// Map response to model
-	data.Name = types.StringValue(updatedProduct.Name)
-	data.Description = types.StringValue(updatedProduct.Description)
-
-	// Map data assets
-	if len(updatedProduct.DataAssets) > 0 {
-		DataAssets := make([]DataProductAssetResourceModel, 0, len(updatedProduct.DataAssets))
-		for _, asset := range updatedProduct.DataAssets {
-			DataAssets = append(DataAssets, DataProductAssetResourceModel{
-				Type: asset.Type,
-				UUID: types.StringValue(asset.UUID),
-			})
-		}
-		data.DataAssets = DataAssets
+	state.UUID = types.StringValue(productResponse.UUID)
+	state.Name = types.StringValue(productResponse.Name)
+	if productResponse.Description == "" {
+		state.Description = types.StringNull()
 	} else {
-		data.DataAssets = []DataProductAssetResourceModel{}
+		state.Description = types.StringValue(productResponse.Description)
+	}
+	if productResponse.DataDomain != nil {
+		state.DataDomainUUID = types.StringValue(productResponse.DataDomain.UUID)
+	} else {
+		state.DataDomainUUID = types.StringNull()
 	}
 
-	tflog.Trace(ctx, "updated a data product resource")
+	// Map data assets
+	if len(productResponse.DataAssets) > 0 {
+		dataAssets := make([]DataProductAssetResourceModel, 0, len(productResponse.DataAssets))
+		for _, asset := range productResponse.DataAssets {
+			var mappedAsset DataProductAssetResourceModel
+			mappedAsset.Type = asset.Type
+			mappedAsset.UUID = types.StringValue(asset.UUID)
+			mappedAsset.Project = types.StringValue(asset.Project)
+			mappedAsset.Dataset = types.StringValue(asset.Dataset)
+			mappedAsset.Table = types.StringValue(asset.Table)
+			if asset.Table == "" {
+				mappedAsset.Table = types.StringNull()
+			} else {
+				mappedAsset.Table = types.StringValue(asset.Table)
+			}
+			mappedAsset.AlertType = types.StringValue(string(asset.AlertType))
+
+			// Add the mapped asset to the list
+			dataAssets = append(dataAssets, mappedAsset)
+		}
+		state.DataAssets = dataAssets
+	} else {
+		state.DataAssets = []DataProductAssetResourceModel{}
+	}
 
 	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *DataProductResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data DataProductResourceModel
+	var state DataProductResourceModel
 
 	// Read Terraform prior state data into the model
-	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Delete data product
-	err := r.client.DeleteDataProduct(data.UUID.ValueString())
+	err := r.client.DeleteDataProduct(state.UUID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete data product, got error: %s", err))
 		return
 	}
-
-	tflog.Trace(ctx, "deleted a data product resource")
 }
 
 func (r *DataProductResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

@@ -20,25 +20,30 @@ resource "masthead_user" "example_user" {
   role  = "USER"
 }
 
-resource "masthead_data_domain" "example_domain" {
-  name  = "Test Domain"
-  email = "test@example.com"
-  slack_channel = {
-    name = "10x-infra"
-  }
+resource "masthead_user" "example_user1" {
+  email = "user1@example.com"
+  role  = "OWNER"
 }
 
-resource "masthead_data_product" "example" {
-  name        = "Test Data Product"
-  description = "Product containing company analytics data"
-  domain = {
-    uuid = masthead_data_domain.example_domain.uuid
-  }
+resource "masthead_data_domain" "example_domain1" {
+  name  = "Test Domain1"
+  email = "test@example.com"
+}
 
+resource "masthead_data_domain" "example_domain2" {
+  name               = "Test Domain2"
+  email              = "test1@example.com"
+  slack_channel_name = "data-ops"
+}
+
+resource "masthead_data_product" "example_product1" {
+  name             = "Test Data Product1"
+  description      = "Product containing company analytics data"
+  data_domain_uuid = masthead_data_domain.example_domain1.uuid
   data_assets = [{
     type    = "TABLE"
-    project = "httparchive"
-    dataset = "crawl"
-    table   = "pages"
+    project = "project_id"
+    dataset = "dataset_id"
+    table   = "table_id"
   }]
 }

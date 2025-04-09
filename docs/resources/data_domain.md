@@ -22,19 +22,8 @@ Manages a Masthead data domain
 
 ### Optional
 
-- `slack_channel` (Attributes) Slack channel associated with the data domain (see [below for nested schema](#nestedatt--slack_channel))
+- `slack_channel_name` (String) Slack channel name associated with the data domain
 
 ### Read-Only
 
 - `uuid` (String) UUID of the data domain
-
-<a id="nestedatt--slack_channel"></a>
-### Nested Schema for `slack_channel`
-
-Required:
-
-- `name` (String) Name of the Slack channel
-
-Read-Only:
-
-- `id` (String) ID of the Slack channel

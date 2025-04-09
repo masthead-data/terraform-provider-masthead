@@ -50,9 +50,9 @@ type DataDomain struct {
 	Name             string       `json:"name"`
 	Email            string       `json:"email"`
 	SlackChannelName string       `json:"slackChannelName,omitempty"`
-	SlackChannel     SlackChannel `json:"slackChannel,omitempty"`
-	CreatedAt        time.Time    `json:"createdAt,omitempty"`
-	UpdatedAt        time.Time    `json:"updatedAt,omitempty"`
+	SlackChannel     SlackChannel `json:"slackChannel"`
+	CreatedAt        time.Time    `json:"createdAt"`
+	UpdatedAt        time.Time    `json:"updatedAt"`
 }
 
 // DomainResponse represents the response from the create/update domain API
@@ -98,11 +98,11 @@ type DataProductAsset struct {
 type DataProduct struct {
 	UUID           string             `json:"uuid"`
 	Name           string             `json:"name"`
-	DataDomainUUID string             `json:"dataDomainUuid,omitempty"`
+	DataDomainUUID string             `json:"dataDomainUuid"`
 	Description    string             `json:"description"`
 	DataDomain     *DataDomain        `json:"domain"`
-	CreatedAt      time.Time          `json:"createdAt,omitempty"`
-	UpdatedAt      time.Time          `json:"updatedAt,omitempty"`
+	CreatedAt      time.Time          `json:"createdAt"`
+	UpdatedAt      time.Time          `json:"updatedAt"`
 	DataAssets     []DataProductAsset `json:"dataAssets"`
 }
 

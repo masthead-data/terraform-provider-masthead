@@ -2,7 +2,6 @@ package masthead
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

@@ -22,8 +22,8 @@ Manages a Masthead data product
 
 ### Optional
 
+- `data_domain_uuid` (String) UUID of the data domain this product belongs to
 - `description` (String) Description of the data product
-- `domain` (Attributes) Data domain associated with this data product (see [below for nested schema](#nestedatt--domain))
 
 ### Read-Only
 
@@ -34,40 +34,15 @@ Manages a Masthead data product
 
 Required:
 
+- `dataset` (String) Dataset associated with the data asset
+- `project` (String) Project associated with the data asset
 - `type` (String) Type of the data asset (DATASET, TABLE)
 
 Optional:
 
-- `alert_type` (String) Alert type associated with the data asset
-- `dataset` (String) Dataset associated with the data asset
-- `project` (String) Project associated with the data asset
 - `table` (String) Table associated with the data asset
 
 Read-Only:
 
+- `alert_type` (String) Alert type associated with the data asset
 - `uuid` (String) UUID of the data asset
-
-
-<a id="nestedatt--domain"></a>
-### Nested Schema for `domain`
-
-Required:
-
-- `uuid` (String) UUID of the data domain
-
-Optional:
-
-- `slack_channel` (Attributes) Slack channel associated with the data domain (see [below for nested schema](#nestedatt--domain--slack_channel))
-
-Read-Only:
-
-- `email` (String) Email associated with the data domain
-- `name` (String) Name of the data domain
-
-<a id="nestedatt--domain--slack_channel"></a>
-### Nested Schema for `domain.slack_channel`
-
-Read-Only:
-
-- `id` (String) ID of the Slack channel
-- `name` (String) Name of the Slack channel

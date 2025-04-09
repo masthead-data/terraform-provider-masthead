@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	masthead "github.com/masthead-data/terraform-provider-masthead/internal/client"
 )
 
@@ -23,13 +22,6 @@ type UserDataSource struct {
 	client *masthead.Client
 }
 
-// UserDataSourceModel describes the data source data model.
-type UserDataSourceModel struct {
-	Id    types.String      `tfsdk:"id"`
-	Email types.String      `tfsdk:"email"`
-	Role  masthead.UserRole `tfsdk:"role"`
-}
-
 func (d *UserDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_user"
 }
@@ -38,16 +30,12 @@ func (d *UserDataSource) Schema(ctx context.Context, req datasource.SchemaReques
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Fetch information about a Masthead user",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				MarkdownDescription: "Unique identifier for the user.",
-				Computed:            true,
-			},
 			"email": schema.StringAttribute{
 				MarkdownDescription: "Email address of the user",
 				Required:            true,
 			},
 			"role": schema.StringAttribute{
-				MarkdownDescription: "Role of the user (e.g., admin, user)",
+				MarkdownDescription: "Role of the user (supported values: USER, OWNER)",
 				Computed:            true,
 			},
 		},
@@ -73,16 +61,17 @@ func (d *UserDataSource) Configure(ctx context.Context, req datasource.Configure
 }
 
 func (d *UserDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data UserDataSourceModel
+	var config UserResourceModel
+	var state UserResourceModel
 
 	// Read Terraform configuration data into the model
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Get all users from Masthead API
-	users, err := d.client.ListUsers()
+	usersResponse, err := d.client.ListUsers()
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read users, got error: %s", err))
 		return
@@ -90,9 +79,10 @@ func (d *UserDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 
 	// Find the user with the matching email
 	found := false
-	for _, user := range users {
-		if user.Email == data.Email.ValueString() {
-			data.Role = user.Role
+	for _, user := range usersResponse {
+		if config.Email.ValueString() == user.Email {
+			state.Email = types.StringValue(user.Email)
+			state.Role = user.Role
 			found = true
 			break
 		}
@@ -101,15 +91,11 @@ func (d *UserDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	if !found {
 		resp.Diagnostics.AddError(
 			"User Not Found",
-			fmt.Sprintf("User with email %s was not found", data.Email.ValueString()),
+			fmt.Sprintf("User with email %s was not found", config.Email.ValueString()),
 		)
 		return
 	}
 
-	tflog.Debug(ctx, "Read user data source", map[string]interface{}{
-		"email": data.Email.ValueString(),
-	})
-
 	// Save data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

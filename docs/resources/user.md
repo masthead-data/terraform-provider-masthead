@@ -18,4 +18,4 @@ Manages a Masthead user
 ### Required
 
 - `email` (String) Email address of the user
-- `role` (String) Role of the user (e.g., USER, OWNER)
+- `role` (String) Role of the user (supported values: USER, OWNER)

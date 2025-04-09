@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	masthead "github.com/masthead-data/terraform-provider-masthead/internal/client"
 )
 
@@ -21,26 +20,6 @@ func NewDataProductDataSource() datasource.DataSource {
 // DataProductDataSource defines the data source implementation.
 type DataProductDataSource struct {
 	client *masthead.Client
-}
-
-// DataProductAssetModel describes a data asset in the data source model
-type DataProductAssetModel struct {
-	Type      masthead.DataProductAssetType `tfsdk:"type"`
-	UUID      types.String                  `tfsdk:"uuid"`
-	Project   types.String                  `tfsdk:"project"`
-	Dataset   types.String                  `tfsdk:"dataset"`
-	Table     types.String                  `tfsdk:"table"`
-	AlertType masthead.AlertType            `tfsdk:"alert_type"`
-}
-
-// DataProductDataSourceModel describes the data source data model.
-type DataProductDataSourceModel struct {
-	UUID           types.String            `tfsdk:"uuid"`
-	Name           types.String            `tfsdk:"name"`
-	Description    types.String            `tfsdk:"description"`
-	DataDomainUUID types.String            `tfsdk:"data_domain_uuid"`
-	Domain         DataDomainResourceModel `tfsdk:"domain"`
-	DataAssets     []DataProductAssetModel `tfsdk:"data_assets"`
 }
 
 func (d *DataProductDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -66,38 +45,6 @@ func (d *DataProductDataSource) Schema(ctx context.Context, req datasource.Schem
 			"data_domain_uuid": schema.StringAttribute{
 				MarkdownDescription: "UUID of the data domain this product belongs to",
 				Computed:            true,
-			},
-			"domain": schema.SingleNestedAttribute{
-				MarkdownDescription: "Data domain associated with this data product",
-				Computed:            true,
-				Attributes: map[string]schema.Attribute{
-					"uuid": schema.StringAttribute{
-						MarkdownDescription: "UUID of the data domain",
-						Computed:            true,
-					},
-					"name": schema.StringAttribute{
-						MarkdownDescription: "Name of the data domain",
-						Computed:            true,
-					},
-					"email": schema.StringAttribute{
-						MarkdownDescription: "Email associated with the data domain",
-						Computed:            true,
-					},
-					"slack_channel": schema.SingleNestedAttribute{
-						MarkdownDescription: "Slack channel associated with the data domain",
-						Computed:            true,
-						Attributes: map[string]schema.Attribute{
-							"name": schema.StringAttribute{
-								MarkdownDescription: "Name of the Slack channel",
-								Computed:            true,
-							},
-							"id": schema.StringAttribute{
-								MarkdownDescription: "ID of the Slack channel",
-								Computed:            true,
-							},
-						},
-					},
-				},
 			},
 			"data_assets": schema.ListNestedAttribute{
 				MarkdownDescription: "List of data assets associated with this data product",
@@ -154,54 +101,60 @@ func (d *DataProductDataSource) Configure(ctx context.Context, req datasource.Co
 }
 
 func (d *DataProductDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data DataProductDataSourceModel
+	var config DataProductResourceModel
+	var state DataProductResourceModel
 
 	// Read Terraform configuration data into the model
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Get the data product from Masthead API
-	product, err := d.client.GetDataProduct(data.UUID.ValueString())
+	productResponse, err := d.client.GetDataProduct(config.UUID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read data product, got error: %s", err))
 		return
 	}
 
 	// Map response body to model
-	data.Name = types.StringValue(product.Name)
-	data.Description = types.StringValue(product.Description)
-	data.DataDomainUUID = types.StringValue(product.DataDomainUUID)
+	state.Name = types.StringValue(productResponse.Name)
+	if productResponse.Description == "" {
+		state.Description = types.StringNull()
+	} else {
+		state.Description = types.StringValue(productResponse.Description)
+	}
+	if productResponse.DataDomain != nil {
+		state.DataDomainUUID = types.StringValue(productResponse.DataDomain.UUID)
+	} else {
+		state.DataDomainUUID = types.StringNull()
+	}
 
 	// Map data assets
-	dataAssets := make([]DataProductAssetModel, 0, len(product.DataAssets))
-	for _, asset := range product.DataAssets {
-		dataAssets = append(dataAssets, DataProductAssetModel{
-			Type:      asset.Type,
-			UUID:      types.StringValue(asset.UUID),
-			Project:   types.StringValue(asset.Project),
-			Dataset:   types.StringValue(asset.Dataset),
-			Table:     types.StringValue(asset.Table),
-			AlertType: asset.AlertType,
-		})
-	}
-	data.DataAssets = dataAssets
+	if len(productResponse.DataAssets) > 0 {
+		dataAssets := make([]DataProductAssetResourceModel, 0, len(productResponse.DataAssets))
+		for _, asset := range productResponse.DataAssets {
+			var mappedAsset DataProductAssetResourceModel
+			mappedAsset.Type = asset.Type
+			mappedAsset.UUID = types.StringValue(asset.UUID)
+			mappedAsset.Project = types.StringValue(asset.Project)
+			mappedAsset.Dataset = types.StringValue(asset.Dataset)
+			mappedAsset.Table = types.StringValue(asset.Table)
+			if asset.Table == "" {
+				mappedAsset.Table = types.StringNull()
+			} else {
+				mappedAsset.Table = types.StringValue(asset.Table)
+			}
+			mappedAsset.AlertType = types.StringValue(string(asset.AlertType))
 
-	data.Domain = DataDomainResourceModel{
-		UUID:  types.StringValue(product.DataDomain.UUID),
-		Name:  types.StringValue(product.DataDomain.Name),
-		Email: types.StringValue(product.DataDomain.Email),
-		SlackChannel: SlackChannelModel{
-			Name: types.StringValue(product.DataDomain.SlackChannel.Name),
-			ID:   types.StringValue(product.DataDomain.SlackChannel.ID),
-		},
+			// Add the mapped asset to the list
+			dataAssets = append(dataAssets, mappedAsset)
+		}
+		state.DataAssets = dataAssets
+	} else {
+		state.DataAssets = []DataProductAssetResourceModel{}
 	}
-
-	tflog.Debug(ctx, "Read data product data source", map[string]interface{}{
-		"uuid": data.UUID.ValueString(),
-	})
 
 	// Save data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

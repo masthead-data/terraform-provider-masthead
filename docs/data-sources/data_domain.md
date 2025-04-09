@@ -23,12 +23,4 @@ Fetch information about a Masthead data domain
 
 - `email` (String) Email associated with the data domain
 - `name` (String) Name of the data domain
-- `slack_channel` (Attributes) Slack channel associated with the data domain (see [below for nested schema](#nestedatt--slack_channel))
-
-<a id="nestedatt--slack_channel"></a>
-### Nested Schema for `slack_channel`
-
-Read-Only:
-
-- `id` (String) ID of the Slack channel
-- `name` (String) Name of the Slack channel
+- `slack_channel_name` (String) Slack channel name associated with the data domain

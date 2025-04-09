@@ -24,7 +24,6 @@ Fetch information about a Masthead data product
 - `data_assets` (Attributes List) List of data assets associated with this data product (see [below for nested schema](#nestedatt--data_assets))
 - `data_domain_uuid` (String) UUID of the data domain this product belongs to
 - `description` (String) Description of the data product
-- `domain` (Attributes) Data domain associated with this data product (see [below for nested schema](#nestedatt--domain))
 - `name` (String) Name of the data product
 
 <a id="nestedatt--data_assets"></a>
@@ -38,22 +37,3 @@ Read-Only:
 - `table` (String) Table of the data asset
 - `type` (String) Type of the data asset (DATASET, TABLE)
 - `uuid` (String) UUID of the data asset
-
-
-<a id="nestedatt--domain"></a>
-### Nested Schema for `domain`
-
-Read-Only:
-
-- `email` (String) Email associated with the data domain
-- `name` (String) Name of the data domain
-- `slack_channel` (Attributes) Slack channel associated with the data domain (see [below for nested schema](#nestedatt--domain--slack_channel))
-- `uuid` (String) UUID of the data domain
-
-<a id="nestedatt--domain--slack_channel"></a>
-### Nested Schema for `domain.slack_channel`
-
-Read-Only:
-
-- `id` (String) ID of the Slack channel
-- `name` (String) Name of the Slack channel
