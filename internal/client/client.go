@@ -14,14 +14,12 @@ const HostURL string = "https://metadata.mastheadata.com"
 // TokenEnvVar - Environment variable for the Masthead API token
 const TokenEnvVar string = "MASTHEAD_API_TOKEN"
 
-// Client -
 type Client struct {
 	HostURL    string
 	HTTPClient *http.Client
 	Token      string
 }
 
-// NewClient -
 func NewClient(token *string) (*Client, error) {
 	c := Client{
 		HTTPClient: &http.Client{Timeout: 10 * time.Second},

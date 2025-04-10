@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	masthead "github.com/masthead-data/terraform-provider-masthead/internal/client"
 )
 
@@ -21,14 +20,6 @@ func NewDataDomainDataSource() datasource.DataSource {
 // DataDomainDataSource defines the data source implementation.
 type DataDomainDataSource struct {
 	client *masthead.Client
-}
-
-// DataDomainDataSourceModel describes the data source data model.
-type DataDomainDataSourceModel struct {
-	UUID             types.String `tfsdk:"uuid"`
-	Name             types.String `tfsdk:"name"`
-	Email            types.String `tfsdk:"email"`
-	SlackChannelName types.String `tfsdk:"slack_channel_name"`
 }
 
 func (d *DataDomainDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -52,7 +43,7 @@ func (d *DataDomainDataSource) Schema(ctx context.Context, req datasource.Schema
 				Computed:            true,
 			},
 			"slack_channel_name": schema.StringAttribute{
-				MarkdownDescription: "Name of the Slack channel associated with the data domain",
+				MarkdownDescription: "Slack channel name associated with the data domain",
 				Computed:            true,
 			},
 		},
@@ -78,32 +69,31 @@ func (d *DataDomainDataSource) Configure(ctx context.Context, req datasource.Con
 }
 
 func (d *DataDomainDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data DataDomainDataSourceModel
+	var config DataDomainResourceModel
+	var state DataDomainResourceModel
 
 	// Read Terraform configuration data into the model
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Get the data domain from Masthead API
-	domain, err := d.client.GetDomain(data.UUID.ValueString())
+	domainResponse, err := d.client.GetDomain(config.UUID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read data domain, got error: %s", err))
 		return
 	}
 
 	// Map response body to model
-	data.Name = types.StringValue(domain.Name)
-	data.Email = types.StringValue(domain.Email)
-	if domain.SlackChannelName != "" {
-		data.SlackChannelName = types.StringValue(domain.SlackChannelName)
+	state.Name = types.StringValue(domainResponse.Name)
+	state.Email = types.StringValue(domainResponse.Email)
+	if domainResponse.SlackChannel != (masthead.SlackChannel{}) {
+		state.SlackChannelName = types.StringValue(domainResponse.SlackChannel.Name)
+	} else {
+		state.SlackChannelName = types.StringNull()
 	}
 
-	tflog.Debug(ctx, "Read data domain data source", map[string]interface{}{
-		"uuid": data.UUID.ValueString(),
-	})
-
 	// Save data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

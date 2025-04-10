@@ -10,13 +10,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	masthead "github.com/masthead-data/terraform-provider-masthead/internal/client"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces
-var _ resource.Resource = &DataDomainResource{}
-var _ resource.ResourceWithImportState = &DataDomainResource{}
+var (
+	_ resource.Resource                = &DataDomainResource{}
+	_ resource.ResourceWithImportState = &DataDomainResource{}
+)
 
 func NewDataDomainResource() resource.Resource {
 	return &DataDomainResource{}
@@ -27,7 +28,6 @@ type DataDomainResource struct {
 	client *masthead.Client
 }
 
-// DataDomainResourceModel describes the resource data model.
 type DataDomainResourceModel struct {
 	UUID             types.String `tfsdk:"uuid"`
 	Name             types.String `tfsdk:"name"`
@@ -59,7 +59,7 @@ func (r *DataDomainResource) Schema(ctx context.Context, req resource.SchemaRequ
 				Required:            true,
 			},
 			"slack_channel_name": schema.StringAttribute{
-				MarkdownDescription: "Name of the Slack channel associated with the data domain",
+				MarkdownDescription: "Slack channel name associated with the data domain",
 				Optional:            true,
 			},
 		},
@@ -85,109 +85,111 @@ func (r *DataDomainResource) Configure(ctx context.Context, req resource.Configu
 }
 
 func (r *DataDomainResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data DataDomainResourceModel
+	var plan DataDomainResourceModel
+	var state DataDomainResourceModel
 
 	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Create new domain
-	domain := masthead.Domain{
-		Name:             data.Name.ValueString(),
-		Email:            data.Email.ValueString(),
-		SlackChannelName: data.SlackChannelName.ValueString(),
+	domainRequest := masthead.DataDomain{
+		Name:             plan.Name.ValueString(),
+		Email:            plan.Email.ValueString(),
+		SlackChannelName: plan.SlackChannelName.ValueString(),
 	}
 
-	createdDomain, err := r.client.CreateDomain(domain)
+	domainResponse, err := r.client.CreateDomain(domainRequest)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create data domain, got error: %s", err))
 		return
 	}
 
 	// Map response to model
-	data.UUID = types.StringValue(createdDomain.UUID)
-	data.Name = types.StringValue(createdDomain.Name)
-	data.Email = types.StringValue(createdDomain.Email)
-	if createdDomain.SlackChannel != nil {
-		data.SlackChannelName = types.StringValue(createdDomain.SlackChannel.Name)
+	state.UUID = types.StringValue(domainResponse.UUID)
+	state.Name = types.StringValue(domainResponse.Name)
+	state.Email = types.StringValue(domainResponse.Email)
+	if domainResponse.SlackChannel != (masthead.SlackChannel{}) {
+		state.SlackChannelName = types.StringValue(domainResponse.SlackChannel.Name)
 	} else {
-		data.SlackChannelName = types.StringNull()
+		state.SlackChannelName = types.StringNull()
 	}
 
-	tflog.Trace(ctx, "created a data domain resource")
-
 	// Save data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *DataDomainResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data DataDomainResourceModel
+	var plan DataDomainResourceModel
+	var state DataDomainResourceModel
 
 	// Read Terraform prior state data into the model
-	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Get domain by UUID
-	domain, err := r.client.GetDomain(data.UUID.ValueString())
+	domainResponse, err := r.client.GetDomain(plan.UUID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read data domain, got error: %s", err))
 		return
 	}
 
 	// Map response to model
-	data.UUID = types.StringValue(domain.UUID)
-	data.Name = types.StringValue(domain.Name)
-	data.Email = types.StringValue(domain.Email)
-	if domain.SlackChannelName != nil {
-		data.SlackChannelName = types.StringValue(domain.SlackChannelName)
+	state.UUID = types.StringValue(domainResponse.UUID)
+	state.Name = types.StringValue(domainResponse.Name)
+	state.Email = types.StringValue(domainResponse.Email)
+	if domainResponse.SlackChannel != (masthead.SlackChannel{}) {
+		state.SlackChannelName = types.StringValue(domainResponse.SlackChannel.Name)
 	} else {
-		data.SlackChannelName = types.StringNull()
+		state.SlackChannelName = types.StringNull()
 	}
 
 	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *DataDomainResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data DataDomainResourceModel
+	var plan DataDomainResourceModel
+	var state DataDomainResourceModel
 
+	// Read the current state
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Update existing domain
-	domain := masthead.Domain{
-		UUID:             data.UUID.ValueString(),
-		Name:             data.Name.ValueString(),
-		Email:            data.Email.ValueString(),
-		SlackChannelName: data.SlackChannelName.ValueString(),
+	domainRequest := masthead.DataDomain{
+		UUID:             plan.UUID.ValueString(),
+		Name:             plan.Name.ValueString(),
+		Email:            plan.Email.ValueString(),
+		SlackChannelName: plan.SlackChannelName.ValueString(),
 	}
 
-	updatedDomain, err := r.client.UpdateDomain(domain)
+	domainResponse, err := r.client.UpdateDomain(domainRequest)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update data domain, got error: %s", err))
 		return
 	}
 
 	// Map response to model
-	data.Name = types.StringValue(updatedDomain.Name)
-	data.Email = types.StringValue(updatedDomain.Email)
-	if updatedDomain.SlackChannel != nil {
-		data.SlackChannelName = types.StringValue(updatedDomain.SlackChannelName)
+	state.UUID = types.StringValue(domainResponse.UUID)
+	state.Name = types.StringValue(domainResponse.Name)
+	state.Email = types.StringValue(domainResponse.Email)
+	if domainResponse.SlackChannel != (masthead.SlackChannel{}) {
+		state.SlackChannelName = types.StringValue(domainResponse.SlackChannel.Name)
 	} else {
-		data.SlackChannelName = types.StringNull()
+		state.SlackChannelName = types.StringNull()
 	}
 
-	tflog.Trace(ctx, "updated a data domain resource")
-
 	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *DataDomainResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -205,8 +207,6 @@ func (r *DataDomainResource) Delete(ctx context.Context, req resource.DeleteRequ
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete data domain, got error: %s", err))
 		return
 	}
-
-	tflog.Trace(ctx, "deleted a data domain resource")
 }
 
 func (r *DataDomainResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

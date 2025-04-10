@@ -10,7 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	masthead "github.com/masthead-data/terraform-provider-masthead/internal/client"
 )
 
@@ -29,9 +28,8 @@ type UserResource struct {
 
 // UserResourceModel describes the resource data model.
 type UserResourceModel struct {
-	Id    types.String `tfsdk:"id"`
-	Email types.String `tfsdk:"email"`
-	Role  types.String `tfsdk:"role"`
+	Email types.String      `tfsdk:"email"`
+	Role  masthead.UserRole `tfsdk:"role"`
 }
 
 func (r *UserResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -42,19 +40,15 @@ func (r *UserResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a Masthead user",
 		Attributes: map[string]schema.Attribute{
-			"id": schema.StringAttribute{
-				MarkdownDescription: "Unique identifier for the user.",
-				Computed:            true,
+			"email": schema.StringAttribute{
+				MarkdownDescription: "Email address of the user",
+				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"email": schema.StringAttribute{
-				MarkdownDescription: "Email address of the user",
-				Required:            true,
-			},
 			"role": schema.StringAttribute{
-				MarkdownDescription: "Role of the user (e.g., USER, OWNER)",
+				MarkdownDescription: "Role of the user (supported values: USER, OWNER)",
 				Required:            true,
 			},
 		},
@@ -80,27 +74,34 @@ func (r *UserResource) Configure(ctx context.Context, req resource.ConfigureRequ
 }
 
 func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var user UserResourceModel
+	var plan UserResourceModel
+	var state UserResourceModel
 
 	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &user)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	// Create user object
+	userRequest := masthead.User{
+		Email: plan.Email.ValueString(),
+		Role:  plan.Role,
+	}
+
 	// Create new user
-	createdUser, err := r.client.CreateUser(user)
+	userResponse, err := r.client.CreateUser(userRequest)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create user, got error: %s", err))
 		return
 	}
 
-	// Set resource ID to the email address
-	// For Masthead users, email is the unique identifier
-	tflog.Trace(ctx, "created a user resource")
+	// Map API response to model
+	state.Email = types.StringValue(userResponse.Email)
+	state.Role = userResponse.Role
 
 	// Save data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &createdUser)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -123,8 +124,7 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	found := false
 	for _, user := range users {
 		if user.Email == data.Email.ValueString() {
-			data.Id = types.StringValue(user.Id)
-			data.Role = types.StringValue(user.Role)
+			data.Role = user.Role
 			found = true
 			break
 		}
@@ -141,44 +141,49 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 }
 
 func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data UserResourceModel
+	var plan UserResourceModel
+	var state UserResourceModel
 
 	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Update existing user role
-	updatedUser, err := r.client.UpdateUserRole(data)
+	userRequest := masthead.User{
+		Email: plan.Email.ValueString(),
+		Role:  plan.Role,
+	}
+
+	userResponse, err := r.client.UpdateUserRole(userRequest)
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update user, got error: %s", err))
 		return
 	}
 
-	tflog.Trace(ctx, "updated a user resource")
+	// Map API response to model
+	state.Email = types.StringValue(userResponse.Email)
+	state.Role = userResponse.Role
 
 	// Save updated data into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &updatedUser)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var user UserResourceModel
+	var state UserResourceModel
 
 	// Read Terraform prior state data into the model
-	resp.Diagnostics.Append(req.State.Get(ctx, &user)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
 	// Delete user
-	err := r.client.DeleteUser(user.Email.ValueString())
+	err := r.client.DeleteUser(state.Email.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete user, got error: %s", err))
 		return
 	}
-
-	tflog.Trace(ctx, "deleted a user resource")
 }
 
 func (r *UserResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
