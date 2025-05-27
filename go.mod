@@ -5,7 +5,7 @@ go 1.24.1
 require (
 	github.com/hashicorp/terraform-plugin-framework v1.15.0
 	github.com/hashicorp/terraform-plugin-go v0.28.0
-	github.com/stretchr/testify v1.8.3
+	github.com/stretchr/testify v1.10.0
 )
 
 require (
