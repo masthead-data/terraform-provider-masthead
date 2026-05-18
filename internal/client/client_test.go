@@ -2,14 +2,18 @@ package masthead
 
 import (
 	"fmt"
-	"testing"
 	"os"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 // TestClient is a placeholder test function to make the test file valid
 func TestClient(t *testing.T) {
+	if os.Getenv("TF_ACC") != "1" {
+		t.Skip("Skipping integration test; set TF_ACC=1 to run")
+	}
+
 	// Retrieve API token from the MASTHEAD_API_TOKEN environment variable
 	apiToken := os.Getenv("MASTHEAD_API_TOKEN")
 	assert.NotEmpty(t, apiToken, "API token should not be empty")
