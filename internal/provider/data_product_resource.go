@@ -163,7 +163,7 @@ func (r *DataProductResource) ModifyPlan(ctx context.Context, req resource.Modif
 	}
 
 	for _, asset := range plan.DataAssets {
-		if asset.Project.IsUnknown() || asset.Dataset.IsUnknown() || asset.Table.IsUnknown() {
+		if asset.UUID.IsUnknown() || asset.Project.IsUnknown() || asset.Dataset.IsUnknown() || asset.Table.IsUnknown() {
 			return // computed references — validate at apply instead
 		}
 	}
