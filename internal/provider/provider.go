@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"os"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -37,7 +38,8 @@ type mastheadProvider struct {
 
 // mastheadProviderModel maps provider schema data to a Go type.
 type mastheadProviderModel struct {
-	Token types.String `tfsdk:"api_token"`
+	Token   types.String `tfsdk:"api_token"`
+	Timeout types.Int64  `tfsdk:"request_timeout_seconds"`
 }
 
 func (p *mastheadProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -57,6 +59,10 @@ func (p *mastheadProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				Required:  false,
 				Optional:  true,
 				Sensitive: true,
+			},
+			"request_timeout_seconds": schema.Int64Attribute{
+				MarkdownDescription: "HTTP client timeout in seconds for Masthead API calls (default 120)",
+				Optional:            true,
 			},
 		},
 	}
@@ -114,7 +120,8 @@ func (p *mastheadProvider) Configure(ctx context.Context, req provider.Configure
 	}
 
 	// Create a new Masthead client using the configuration values
-	client, err := masthead.NewClient(&api_token)
+	timeout := time.Duration(config.Timeout.ValueInt64()) * time.Second
+	client, err := masthead.NewClient(&api_token, timeout)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to Create Masthead API Client",

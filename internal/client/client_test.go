@@ -3,6 +3,7 @@ package masthead
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,7 +20,7 @@ func TestClient(t *testing.T) {
 	assert.NotEmpty(t, apiToken, "API token should not be empty")
 
 	// Instantiate a new Masthead API client using the retrieved token
-	apiClient, err := NewClient(&apiToken)
+	apiClient, err := NewClient(&apiToken, 0)
 	assert.NoError(t, err, "Client creation should not return an error")
 
 	t.Log("Masthead API client created successfully")
@@ -27,6 +28,44 @@ func TestClient(t *testing.T) {
 	// Call the example function to demonstrate API operations
 	apiClientExample(apiClient, t)
 	fmt.Println("Completed successfully")
+}
+
+func TestFormatAPIError(t *testing.T) {
+	cases := []struct {
+		name   string
+		status int
+		body   string
+		want   []string
+	}{
+		{
+			name:   "structured errors array",
+			status: 400,
+			body:   `{"message":"2 data assets cannot be resolved","errors":[{"type":"TABLE","project":"p","dataset":"d","table":"t1","reason":"DELETED","deletedAt":"2026-07-04T01:27:06Z"},{"type":"LOOKER_DASHBOARD","uuid":"abc-123","reason":"NOT_FOUND"}]}`,
+			want:   []string{"2 data assets cannot be resolved", "TABLE p.d.t1 — DELETED (2026-07-04T01:27:06Z)", "LOOKER_DASHBOARD abc-123 — NOT_FOUND"},
+		},
+		{
+			name:   "plain error body falls back to raw dump",
+			status: 400,
+			body:   `{"message":"Data asset not found."}`,
+			want:   []string{"status: 400", "Data asset not found."},
+		},
+		{
+			name:   "non-JSON body falls back to raw dump",
+			status: 502,
+			body:   `<html>bad gateway</html>`,
+			want:   []string{"status: 502", "<html>bad gateway</html>"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := formatAPIError(tc.status, []byte(tc.body))
+			for _, w := range tc.want {
+				if !strings.Contains(got.Error(), w) {
+					t.Errorf("error %q missing substring %q", got.Error(), w)
+				}
+			}
+		})
+	}
 }
 
 // userExample demonstrates the User API operations

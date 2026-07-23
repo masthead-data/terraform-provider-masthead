@@ -3,12 +3,10 @@ package provider
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -47,66 +45,17 @@ type DataProductResourceModel struct {
 	DataAssets     []DataProductAssetResourceModel `tfsdk:"data_assets"`
 }
 
-// normalizeAndSortDataAssets ensures that data assets with null or empty table values are treated consistently and sorts the list of data assets for reliable comparisons.
-func normalizeAndSortDataAssets(assets []DataProductAssetResourceModel) []DataProductAssetResourceModel {
+// normalizeDataAssets maps empty table values to null so config (null) and API ("") compare equal.
+func normalizeDataAssets(assets []DataProductAssetResourceModel) []DataProductAssetResourceModel {
 	for index := range assets {
 		if assets[index].Table.IsNull() || assets[index].Table.IsUnknown() {
 			assets[index].Table = types.StringNull()
 			continue
 		}
-
-		tableValue := assets[index].Table.ValueString()
-		if tableValue == "" {
+		if assets[index].Table.ValueString() == "" {
 			assets[index].Table = types.StringNull()
 		}
 	}
-
-	sort.SliceStable(assets, func(left, right int) bool {
-		leftType := string(assets[left].Type)
-		rightType := string(assets[right].Type)
-		if leftType != rightType {
-			return leftType < rightType
-		}
-
-		leftProject := assets[left].Project.ValueString()
-		rightProject := assets[right].Project.ValueString()
-		if leftProject != rightProject {
-			return leftProject < rightProject
-		}
-
-		leftDataset := assets[left].Dataset.ValueString()
-		rightDataset := assets[right].Dataset.ValueString()
-		if leftDataset != rightDataset {
-			return leftDataset < rightDataset
-		}
-
-		leftTable := ""
-		rightTable := ""
-		if !assets[left].Table.IsNull() && !assets[left].Table.IsUnknown() {
-			leftTable = assets[left].Table.ValueString()
-		}
-		if !assets[right].Table.IsNull() && !assets[right].Table.IsUnknown() {
-			rightTable = assets[right].Table.ValueString()
-		}
-		if leftTable != rightTable {
-			return leftTable < rightTable
-		}
-
-		leftAlertType := assets[left].AlertType.ValueString()
-		rightAlertType := assets[right].AlertType.ValueString()
-		if leftAlertType != rightAlertType {
-			return leftAlertType < rightAlertType
-		}
-
-		leftUUID := assets[left].UUID.ValueString()
-		rightUUID := assets[right].UUID.ValueString()
-		if leftUUID != rightUUID {
-			return leftUUID < rightUUID
-		}
-
-		return false
-	})
-
 	return assets
 }
 
@@ -137,12 +86,9 @@ func (r *DataProductResource) Schema(ctx context.Context, req resource.SchemaReq
 				MarkdownDescription: "Description of the data product",
 				Optional:            true,
 			},
-			"data_assets": schema.ListNestedAttribute{
+			"data_assets": schema.SetNestedAttribute{
 				MarkdownDescription: "List of data assets associated with this data product",
 				Required:            true,
-				PlanModifiers: []planmodifier.List{
-					listplanmodifier.UseStateForUnknown(),
-				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"type": schema.StringAttribute{
@@ -271,7 +217,7 @@ func (r *DataProductResource) Create(ctx context.Context, req resource.CreateReq
 			// Add the mapped asset to the list
 			dataAssets = append(dataAssets, mappedAsset)
 		}
-		state.DataAssets = normalizeAndSortDataAssets(dataAssets)
+		state.DataAssets = normalizeDataAssets(dataAssets)
 	} else {
 		state.DataAssets = []DataProductAssetResourceModel{}
 	}
@@ -328,7 +274,7 @@ func (r *DataProductResource) Read(ctx context.Context, req resource.ReadRequest
 			}
 			dataAssets = append(dataAssets, mappedAsset)
 		}
-		state.DataAssets = normalizeAndSortDataAssets(dataAssets)
+		state.DataAssets = normalizeDataAssets(dataAssets)
 	} else {
 		state.DataAssets = []DataProductAssetResourceModel{}
 	}
@@ -410,7 +356,7 @@ func (r *DataProductResource) Update(ctx context.Context, req resource.UpdateReq
 			// Add the mapped asset to the list
 			dataAssets = append(dataAssets, mappedAsset)
 		}
-		state.DataAssets = normalizeAndSortDataAssets(dataAssets)
+		state.DataAssets = normalizeDataAssets(dataAssets)
 	} else {
 		state.DataAssets = []DataProductAssetResourceModel{}
 	}

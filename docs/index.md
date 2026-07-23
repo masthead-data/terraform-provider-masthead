@@ -70,3 +70,4 @@ resource "masthead_data_product" "example_product1" {
 ### Optional
 
 - `api_token` (String, Sensitive) Masthead API Token. This token is used to authenticate with the Masthead API. To obtain a token, log in to your Masthead account and navigate to the **Settings / API Tokens** page. Create a new token and copy it here. Alternatively, you can set the `MASTHEAD_API_TOKEN` environment variable to use the token from there.
+- `request_timeout_seconds` (Number) HTTP client timeout in seconds for Masthead API calls (default 120)
