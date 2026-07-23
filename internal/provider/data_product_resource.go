@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -198,6 +199,10 @@ func (r *DataProductResource) ModifyPlan(ctx context.Context, req resource.Modif
 		return
 	}
 
+	if len(details) == 0 {
+		return
+	}
+	lines := make([]string, 0, len(details))
 	for _, detail := range details {
 		identity := detail.UUID
 		if detail.Table != "" {
@@ -205,12 +210,17 @@ func (r *DataProductResource) ModifyPlan(ctx context.Context, req resource.Modif
 		} else if detail.Dataset != "" {
 			identity = fmt.Sprintf("%s.%s", detail.Project, detail.Dataset)
 		}
-		message := fmt.Sprintf("%s %s — %s", detail.Type, identity, detail.Reason)
+		line := fmt.Sprintf("  - %s %s — %s", detail.Type, identity, detail.Reason)
 		if detail.DeletedAt != "" {
-			message += " (" + detail.DeletedAt + ")"
+			line += " (" + detail.DeletedAt + ")"
 		}
-		resp.Diagnostics.AddAttributeError(path.Root("data_assets"), "Unresolvable data asset", message)
+		lines = append(lines, line)
 	}
+	resp.Diagnostics.AddAttributeError(
+		path.Root("data_assets"),
+		fmt.Sprintf("%d unresolvable data asset(s)", len(details)),
+		strings.Join(lines, "\n"),
+	)
 }
 
 func (r *DataProductResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
