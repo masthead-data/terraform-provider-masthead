@@ -61,7 +61,7 @@ func (p *mastheadProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				Sensitive: true,
 			},
 			"request_timeout_seconds": schema.Int64Attribute{
-				MarkdownDescription: "HTTP client timeout in seconds for Masthead API calls (default 120)",
+				MarkdownDescription: "HTTP client timeout in seconds for Masthead API calls (default 60)",
 				Optional:            true,
 			},
 		},

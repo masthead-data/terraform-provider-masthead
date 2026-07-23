@@ -25,7 +25,7 @@ type Client struct {
 
 func NewClient(token *string, timeout time.Duration) (*Client, error) {
 	if timeout <= 0 {
-		timeout = 120 * time.Second
+		timeout = 60 * time.Second
 	}
 	c := Client{
 		HTTPClient: &http.Client{Timeout: timeout},
