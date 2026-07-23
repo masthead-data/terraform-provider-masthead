@@ -94,7 +94,7 @@ func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 // have been mutated.
 var ErrEmptyValue = errors.New("API returned success with an empty value — likely an upstream timeout; verify server state before retrying")
 
-type apiErrorDetail struct {
+type APIErrorDetail struct {
 	Type      string `json:"type"`
 	Project   string `json:"project,omitempty"`
 	Dataset   string `json:"dataset,omitempty"`
@@ -106,7 +106,7 @@ type apiErrorDetail struct {
 
 type apiErrorBody struct {
 	Message string           `json:"message"`
-	Errors  []apiErrorDetail `json:"errors"`
+	Errors  []APIErrorDetail `json:"errors"`
 }
 
 // formatAPIError renders a non-200 response body. Bodies carrying a structured

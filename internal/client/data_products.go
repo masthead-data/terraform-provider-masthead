@@ -3,6 +3,7 @@ package masthead
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -157,4 +158,46 @@ func (c *Client) DeleteDataProduct(productID string) error {
 
 	_, err = c.doRequest(req)
 	return err
+}
+
+// ValidateDataProduct dry-runs asset validation server-side. supported=false
+// means the backend has no validate endpoint (pre-rollout) — callers should
+// skip plan-time validation, not fail.
+func (c *Client) ValidateDataProduct(dataProduct DataProduct) ([]APIErrorDetail, bool, error) {
+	rb, err := json.Marshal(dataProduct)
+	if err != nil {
+		return nil, false, err
+	}
+	req, err := http.NewRequest("POST",
+		fmt.Sprintf("%s/clientApi/data-product/validate", c.HostURL),
+		strings.NewReader(string(rb)))
+	if err != nil {
+		return nil, false, err
+	}
+	if c.Token != "" {
+		req.Header.Set("X-API-TOKEN", c.Token)
+		req.Header.Set("Content-Type", "application/json")
+	}
+	res, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, false, err
+	}
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, false, err
+	}
+	if res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusMethodNotAllowed {
+		return nil, false, nil
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, true, formatAPIError(res.StatusCode, body)
+	}
+	var parsed struct {
+		Values []APIErrorDetail `json:"values"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil, true, err
+	}
+	return parsed.Values, true, nil
 }
