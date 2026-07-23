@@ -71,6 +71,10 @@ func (c *Client) CreateDomain(dataDomain DataDomain) (*DataDomain, error) {
 		return nil, fmt.Errorf("error: %v. %v", dataDomainResponse.Error, dataDomainResponse.Message)
 	}
 
+	if dataDomainResponse.DataDomain.UUID == "" {
+		return nil, ErrEmptyValue
+	}
+
 	return &dataDomainResponse.DataDomain, nil
 }
 
@@ -95,6 +99,10 @@ func (c *Client) GetDomain(dataDomainID string) (*DataDomain, error) {
 		return nil, err
 	} else if dataDomainResponse.Error != nil {
 		return nil, fmt.Errorf("error: %v. %v", dataDomainResponse.Error, dataDomainResponse.Message)
+	}
+
+	if dataDomainResponse.DataDomain.UUID == "" {
+		return nil, ErrEmptyValue
 	}
 
 	return &dataDomainResponse.DataDomain, nil
@@ -130,6 +138,10 @@ func (c *Client) UpdateDomain(dataDomain DataDomain) (*DataDomain, error) {
 	}
 	if domainResponse.Error != nil {
 		return nil, fmt.Errorf("error: %v. %v", domainResponse.Error, domainResponse.Message)
+	}
+
+	if domainResponse.DataDomain.UUID == "" {
+		return nil, ErrEmptyValue
 	}
 
 	return &domainResponse.DataDomain, nil

@@ -89,6 +89,11 @@ func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 	return body, err
 }
 
+// ErrEmptyValue indicates a 200 response whose value payload was null/empty —
+// typically an upstream timeout masked as success; server state may or may not
+// have been mutated.
+var ErrEmptyValue = errors.New("API returned success with an empty value — likely an upstream timeout; verify server state before retrying")
+
 type apiErrorDetail struct {
 	Type      string `json:"type"`
 	Project   string `json:"project,omitempty"`

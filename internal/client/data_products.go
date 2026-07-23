@@ -76,6 +76,10 @@ func (c *Client) CreateDataProduct(dataProduct DataProduct) (*DataProduct, error
 		return nil, fmt.Errorf("error: %v. %v", productResponse.Error, productResponse.Message)
 	}
 
+	if productResponse.DataProduct.UUID == "" {
+		return nil, ErrEmptyValue
+	}
+
 	return &productResponse.DataProduct, nil
 }
 
@@ -99,6 +103,10 @@ func (c *Client) GetDataProduct(productID string) (*DataProduct, error) {
 		return nil, fmt.Errorf("error: %v. %v", productResponse.Error, productResponse.Message)
 	} else if err != nil {
 		return nil, err
+	}
+
+	if productResponse.DataProduct.UUID == "" {
+		return nil, ErrEmptyValue
 	}
 
 	return &productResponse.DataProduct, nil
@@ -129,6 +137,10 @@ func (c *Client) UpdateDataProduct(dataProduct DataProduct) (*DataProduct, error
 		return nil, fmt.Errorf("error: %v. %v", productResponse.Error, productResponse.Message)
 	} else if err != nil {
 		return nil, err
+	}
+
+	if productResponse.DataProduct.UUID == "" {
+		return nil, ErrEmptyValue
 	}
 
 	return &productResponse.DataProduct, nil
