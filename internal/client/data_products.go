@@ -81,6 +81,12 @@ func (c *Client) CreateDataProduct(dataProduct DataProduct) (*DataProduct, error
 		return nil, ErrEmptyValue
 	}
 
+	c.cacheMutex.Lock()
+	if c.productsCache != nil {
+		c.productsCache[productResponse.DataProduct.UUID] = &productResponse.DataProduct
+	}
+	c.cacheMutex.Unlock()
+
 	return &productResponse.DataProduct, nil
 }
 
@@ -111,6 +117,41 @@ func (c *Client) GetDataProduct(productID string) (*DataProduct, error) {
 	}
 
 	return &productResponse.DataProduct, nil
+}
+
+// GetCachedOrFetchDataProduct retrieves a product from the in-memory cache, bulk-populating
+// the cache on the first call via ListDataProducts().
+func (c *Client) GetCachedOrFetchDataProduct(productID string) (*DataProduct, error) {
+	c.cacheMutex.RLock()
+	if c.productsWarmed {
+		p, found := c.productsCache[productID]
+		c.cacheMutex.RUnlock()
+		if found {
+			return p, nil
+		}
+		// If not in cache, fallback to GetDataProduct
+		return c.GetDataProduct(productID)
+	}
+	c.cacheMutex.RUnlock()
+
+	// Warm cache under write lock
+	c.cacheMutex.Lock()
+	if !c.productsWarmed {
+		allProducts, err := c.ListDataProducts()
+		if err == nil {
+			for i := range allProducts {
+				c.productsCache[allProducts[i].UUID] = &allProducts[i]
+			}
+			c.productsWarmed = true
+		}
+	}
+	p, found := c.productsCache[productID]
+	c.cacheMutex.Unlock()
+
+	if found {
+		return p, nil
+	}
+	return c.GetDataProduct(productID)
 }
 
 // UpdateDataProduct - Update an existing data product
@@ -144,6 +185,12 @@ func (c *Client) UpdateDataProduct(dataProduct DataProduct) (*DataProduct, error
 		return nil, ErrEmptyValue
 	}
 
+	c.cacheMutex.Lock()
+	if c.productsCache != nil {
+		c.productsCache[productResponse.DataProduct.UUID] = &productResponse.DataProduct
+	}
+	c.cacheMutex.Unlock()
+
 	return &productResponse.DataProduct, nil
 }
 
@@ -157,7 +204,17 @@ func (c *Client) DeleteDataProduct(productID string) error {
 	}
 
 	_, err = c.doRequest(req)
-	return err
+	if err != nil {
+		return err
+	}
+
+	c.cacheMutex.Lock()
+	if c.productsCache != nil {
+		delete(c.productsCache, productID)
+	}
+	c.cacheMutex.Unlock()
+
+	return nil
 }
 
 // ValidateDataProduct dry-runs asset validation server-side. supported=false

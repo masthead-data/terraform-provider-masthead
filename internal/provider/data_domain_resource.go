@@ -131,8 +131,8 @@ func (r *DataDomainResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	// Get domain by UUID
-	domainResponse, err := r.client.GetDomain(plan.UUID.ValueString())
+	// Get domain by UUID (using in-memory cache)
+	domainResponse, err := r.client.GetCachedOrFetchDomain(plan.UUID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read data domain, got error: %s", err))
 		return

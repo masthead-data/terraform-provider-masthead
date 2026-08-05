@@ -75,6 +75,12 @@ func (c *Client) CreateDomain(dataDomain DataDomain) (*DataDomain, error) {
 		return nil, ErrEmptyValue
 	}
 
+	c.cacheMutex.Lock()
+	if c.domainsCache != nil {
+		c.domainsCache[dataDomainResponse.DataDomain.UUID] = &dataDomainResponse.DataDomain
+	}
+	c.cacheMutex.Unlock()
+
 	return &dataDomainResponse.DataDomain, nil
 }
 
@@ -106,6 +112,39 @@ func (c *Client) GetDomain(dataDomainID string) (*DataDomain, error) {
 	}
 
 	return &dataDomainResponse.DataDomain, nil
+}
+
+// GetCachedOrFetchDomain retrieves a domain from in-memory cache, bulk-populating
+// the cache on first call via ListDomains().
+func (c *Client) GetCachedOrFetchDomain(dataDomainID string) (*DataDomain, error) {
+	c.cacheMutex.RLock()
+	if c.domainsWarmed {
+		d, found := c.domainsCache[dataDomainID]
+		c.cacheMutex.RUnlock()
+		if found {
+			return d, nil
+		}
+		return c.GetDomain(dataDomainID)
+	}
+	c.cacheMutex.RUnlock()
+
+	c.cacheMutex.Lock()
+	if !c.domainsWarmed {
+		allDomains, err := c.ListDomains()
+		if err == nil {
+			for i := range allDomains {
+				c.domainsCache[allDomains[i].UUID] = &allDomains[i]
+			}
+			c.domainsWarmed = true
+		}
+	}
+	d, found := c.domainsCache[dataDomainID]
+	c.cacheMutex.Unlock()
+
+	if found {
+		return d, nil
+	}
+	return c.GetDomain(dataDomainID)
 }
 
 // UpdateDomain - Update an existing data domain
@@ -144,6 +183,12 @@ func (c *Client) UpdateDomain(dataDomain DataDomain) (*DataDomain, error) {
 		return nil, ErrEmptyValue
 	}
 
+	c.cacheMutex.Lock()
+	if c.domainsCache != nil {
+		c.domainsCache[domainResponse.DataDomain.UUID] = &domainResponse.DataDomain
+	}
+	c.cacheMutex.Unlock()
+
 	return &domainResponse.DataDomain, nil
 }
 
@@ -157,5 +202,15 @@ func (c *Client) DeleteDomain(domainID string) error {
 	}
 
 	_, err = c.doRequest(req)
-	return err
+	if err != nil {
+		return err
+	}
+
+	c.cacheMutex.Lock()
+	if c.domainsCache != nil {
+		delete(c.domainsCache, domainID)
+	}
+	c.cacheMutex.Unlock()
+
+	return nil
 }

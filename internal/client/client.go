@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -18,19 +19,30 @@ const HostURL string = "https://metadata.mastheadata.com"
 const TokenEnvVar string = "MASTHEAD_API_TOKEN"
 
 type Client struct {
-	HostURL    string
-	HTTPClient *http.Client
-	Token      string
+	HostURL        string
+	HTTPClient     *http.Client
+	Token          string
+	productsCache  map[string]*DataProduct
+	domainsCache   map[string]*DataDomain
+	cacheMutex     sync.RWMutex
+	productsWarmed bool
+	domainsWarmed  bool
 }
 
 func NewClient(token *string, timeout time.Duration) (*Client, error) {
 	if timeout <= 0 {
 		timeout = 60 * time.Second
 	}
+	tr := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 50,
+		IdleConnTimeout:     90 * time.Second,
+	}
 	c := Client{
-		HTTPClient: &http.Client{Timeout: timeout},
-		// Default Masthead URL
-		HostURL: HostURL,
+		HTTPClient:    &http.Client{Timeout: timeout, Transport: tr},
+		HostURL:       HostURL,
+		productsCache: make(map[string]*DataProduct),
+		domainsCache:  make(map[string]*DataDomain),
 	}
 
 	if token != nil {

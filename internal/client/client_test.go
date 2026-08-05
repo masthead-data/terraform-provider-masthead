@@ -9,9 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestClient is a placeholder test function to make the test file valid
-func TestClient(t *testing.T) {
-	if os.Getenv("TF_ACC") != "1" {
+func TestAccClient(t *testing.T) {
+	if os.Getenv("TF_ACC") == "" {
 		t.Skip("Skipping integration test; set TF_ACC=1 to run")
 	}
 

@@ -89,7 +89,7 @@ func (r *DataProductResource) Schema(ctx context.Context, req resource.SchemaReq
 				Optional:            true,
 			},
 			"data_assets": schema.SetNestedAttribute{
-				MarkdownDescription: "List of data assets associated with this data product",
+				MarkdownDescription: "Set of data assets associated with this data product",
 				Required:            true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -313,8 +313,8 @@ func (r *DataProductResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	// Get data product by UUID
-	productResponse, err := r.client.GetDataProduct(plan.UUID.ValueString())
+	// Get data product by UUID (using in-memory cache)
+	productResponse, err := r.client.GetCachedOrFetchDataProduct(plan.UUID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read data product, got error: %s", err))
 		return
