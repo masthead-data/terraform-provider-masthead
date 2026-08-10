@@ -13,7 +13,10 @@ func (c *Client) ListDomains() ([]DataDomain, error) {
 	page := 1
 
 	for {
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s/clientApi/data-domain/list?page=%d",
+		// limit must be sent alongside page: the API forwards the pair only when both
+		// are present, otherwise it silently falls back to page=1 and returns the same
+		// first page on every iteration.
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s/clientApi/data-domain/list?page=%d&limit=100",
 			c.HostURL, page), nil)
 		if err != nil {
 			return nil, err
@@ -130,12 +133,15 @@ func (c *Client) GetCachedOrFetchDomain(dataDomainID string) (*DataDomain, error
 
 	c.cacheMutex.Lock()
 	if !c.domainsWarmed {
-		allDomains, err := c.ListDomains()
-		if err == nil {
+		// Mark the bulk warm-up as attempted regardless of outcome. If the list call
+		// is left un-flagged on failure, every subsequent read re-runs the full
+		// paginated list under this write lock before falling back — strictly worse
+		// than going straight to the per-UUID fetch below.
+		c.domainsWarmed = true
+		if allDomains, err := c.ListDomains(); err == nil {
 			for i := range allDomains {
 				c.domainsCache[allDomains[i].UUID] = &allDomains[i]
 			}
-			c.domainsWarmed = true
 		}
 	}
 	d, found := c.domainsCache[dataDomainID]

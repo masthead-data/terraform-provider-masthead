@@ -137,12 +137,15 @@ func (c *Client) GetCachedOrFetchDataProduct(productID string) (*DataProduct, er
 	// Warm cache under write lock
 	c.cacheMutex.Lock()
 	if !c.productsWarmed {
-		allProducts, err := c.ListDataProducts()
-		if err == nil {
+		// Mark the bulk warm-up as attempted regardless of outcome. If the list call
+		// is left un-flagged on failure, every subsequent read re-runs the full
+		// paginated list under this write lock before falling back — strictly worse
+		// than going straight to the per-UUID fetch below.
+		c.productsWarmed = true
+		if allProducts, err := c.ListDataProducts(); err == nil {
 			for i := range allProducts {
 				c.productsCache[allProducts[i].UUID] = &allProducts[i]
 			}
-			c.productsWarmed = true
 		}
 	}
 	p, found := c.productsCache[productID]
