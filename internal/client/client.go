@@ -1,10 +1,14 @@
 package masthead
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -15,16 +19,30 @@ const HostURL string = "https://metadata.mastheadata.com"
 const TokenEnvVar string = "MASTHEAD_API_TOKEN"
 
 type Client struct {
-	HostURL    string
-	HTTPClient *http.Client
-	Token      string
+	HostURL        string
+	HTTPClient     *http.Client
+	Token          string
+	productsCache  map[string]*DataProduct
+	domainsCache   map[string]*DataDomain
+	cacheMutex     sync.RWMutex
+	productsWarmed bool
+	domainsWarmed  bool
 }
 
-func NewClient(token *string) (*Client, error) {
+func NewClient(token *string, timeout time.Duration) (*Client, error) {
+	if timeout <= 0 {
+		timeout = 60 * time.Second
+	}
+	tr := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 50,
+		IdleConnTimeout:     90 * time.Second,
+	}
 	c := Client{
-		HTTPClient: &http.Client{Timeout: 10 * time.Second},
-		// Default Masthead URL
-		HostURL: HostURL,
+		HTTPClient:    &http.Client{Timeout: timeout, Transport: tr},
+		HostURL:       HostURL,
+		productsCache: make(map[string]*DataProduct),
+		domainsCache:  make(map[string]*DataDomain),
 	}
 
 	if token != nil {
@@ -77,8 +95,52 @@ func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("status: %d, body: %s", res.StatusCode, body)
+		return nil, formatAPIError(res.StatusCode, body)
 	}
 
 	return body, err
+}
+
+// ErrEmptyValue indicates a 200 response whose value payload was null/empty —
+// typically an upstream timeout masked as success; server state may or may not
+// have been mutated.
+var ErrEmptyValue = errors.New("API returned success with an empty value — likely an upstream timeout; verify server state before retrying")
+
+type APIErrorDetail struct {
+	Type      string `json:"type"`
+	Project   string `json:"project,omitempty"`
+	Dataset   string `json:"dataset,omitempty"`
+	Table     string `json:"table,omitempty"`
+	UUID      string `json:"uuid,omitempty"`
+	Reason    string `json:"reason"`
+	DeletedAt string `json:"deletedAt,omitempty"`
+}
+
+type apiErrorBody struct {
+	Message string           `json:"message"`
+	Errors  []APIErrorDetail `json:"errors"`
+}
+
+// formatAPIError renders a non-200 response body. Bodies carrying a structured
+// errors[] array become a per-asset diagnostic; anything else falls back to the raw dump.
+func formatAPIError(status int, body []byte) error {
+	var parsed apiErrorBody
+	if err := json.Unmarshal(body, &parsed); err != nil || len(parsed.Errors) == 0 {
+		return fmt.Errorf("status: %d, body: %s", status, body)
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "status: %d: %s:", status, parsed.Message)
+	for _, e := range parsed.Errors {
+		identity := e.UUID
+		if e.Table != "" {
+			identity = fmt.Sprintf("%s.%s.%s", e.Project, e.Dataset, e.Table)
+		} else if e.Dataset != "" {
+			identity = fmt.Sprintf("%s.%s", e.Project, e.Dataset)
+		}
+		fmt.Fprintf(&b, "\n  - %s %s — %s", e.Type, identity, e.Reason)
+		if e.DeletedAt != "" {
+			fmt.Fprintf(&b, " (%s)", e.DeletedAt)
+		}
+	}
+	return errors.New(b.String())
 }

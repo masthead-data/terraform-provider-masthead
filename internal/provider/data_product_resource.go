@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -16,6 +17,7 @@ import (
 // Ensure provider defined types fully satisfy framework interfaces
 var _ resource.Resource = &DataProductResource{}
 var _ resource.ResourceWithImportState = &DataProductResource{}
+var _ resource.ResourceWithModifyPlan = &DataProductResource{}
 
 func NewDataProductResource() resource.Resource {
 	return &DataProductResource{}
@@ -45,6 +47,20 @@ type DataProductResourceModel struct {
 	DataAssets     []DataProductAssetResourceModel `tfsdk:"data_assets"`
 }
 
+// normalizeDataAssets maps empty table values to null so config (null) and API ("") compare equal.
+func normalizeDataAssets(assets []DataProductAssetResourceModel) []DataProductAssetResourceModel {
+	for index := range assets {
+		if assets[index].Table.IsNull() || assets[index].Table.IsUnknown() {
+			assets[index].Table = types.StringNull()
+			continue
+		}
+		if assets[index].Table.ValueString() == "" {
+			assets[index].Table = types.StringNull()
+		}
+	}
+	return assets
+}
+
 func (r *DataProductResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_data_product"
 }
@@ -72,8 +88,8 @@ func (r *DataProductResource) Schema(ctx context.Context, req resource.SchemaReq
 				MarkdownDescription: "Description of the data product",
 				Optional:            true,
 			},
-			"data_assets": schema.ListNestedAttribute{
-				MarkdownDescription: "List of data assets associated with this data product",
+			"data_assets": schema.SetNestedAttribute{
+				MarkdownDescription: "Set of data assets associated with this data product",
 				Required:            true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
@@ -84,6 +100,9 @@ func (r *DataProductResource) Schema(ctx context.Context, req resource.SchemaReq
 						"uuid": schema.StringAttribute{
 							MarkdownDescription: "UUID of the data asset",
 							Computed:            true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 						"project": schema.StringAttribute{
 							MarkdownDescription: "Project associated with the data asset",
@@ -100,6 +119,9 @@ func (r *DataProductResource) Schema(ctx context.Context, req resource.SchemaReq
 						"alert_type": schema.StringAttribute{
 							MarkdownDescription: "Alert type associated with the data asset",
 							Computed:            true,
+							PlanModifiers: []planmodifier.String{
+								stringplanmodifier.UseStateForUnknown(),
+							},
 						},
 					},
 				},
@@ -124,6 +146,81 @@ func (r *DataProductResource) Configure(ctx context.Context, req resource.Config
 	}
 
 	r.client = client
+}
+
+// ModifyPlan validates data assets server-side at plan time so misconfigured
+// or missing assets surface before apply. Destroy plans and plans with
+// unknown asset references are skipped; an unsupported backend or transport
+// error degrades to a single warning so the plan still proceeds.
+func (r *DataProductResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() || r.client == nil {
+		return // destroy plan, or provider not configured yet
+	}
+
+	var plan DataProductResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	for _, asset := range plan.DataAssets {
+		if asset.Project.IsUnknown() || asset.Dataset.IsUnknown() || asset.Table.IsUnknown() {
+			return // computed references — validate at apply instead
+		}
+	}
+
+	payload := masthead.DataProduct{
+		Name:           plan.Name.ValueString(),
+		Description:    plan.Description.ValueString(),
+		DataDomainUUID: plan.DataDomainUUID.ValueString(),
+	}
+	if len(plan.DataAssets) > 0 {
+		payload.DataAssets = make([]masthead.DataProductAsset, 0, len(plan.DataAssets))
+		for _, asset := range plan.DataAssets {
+			payload.DataAssets = append(payload.DataAssets, masthead.DataProductAsset{
+				Type:    asset.Type,
+				UUID:    asset.UUID.ValueString(),
+				Project: asset.Project.ValueString(),
+				Dataset: asset.Dataset.ValueString(),
+				Table:   asset.Table.ValueString(),
+			})
+		}
+	}
+
+	details, supported, err := r.client.ValidateDataProduct(payload)
+	if err != nil {
+		resp.Diagnostics.AddWarning(
+			"Data asset pre-validation unavailable",
+			"Could not validate data assets during plan; they will be validated at apply. Error: "+err.Error(),
+		)
+		return
+	}
+	if !supported {
+		return
+	}
+
+	if len(details) == 0 {
+		return
+	}
+	lines := make([]string, 0, len(details))
+	for _, detail := range details {
+		identity := detail.UUID
+		if detail.Table != "" {
+			identity = fmt.Sprintf("%s.%s.%s", detail.Project, detail.Dataset, detail.Table)
+		} else if detail.Dataset != "" {
+			identity = fmt.Sprintf("%s.%s", detail.Project, detail.Dataset)
+		}
+		line := fmt.Sprintf("  - %s %s — %s", detail.Type, identity, detail.Reason)
+		if detail.DeletedAt != "" {
+			line += " (" + detail.DeletedAt + ")"
+		}
+		lines = append(lines, line)
+	}
+	resp.Diagnostics.AddAttributeError(
+		path.Root("data_assets"),
+		fmt.Sprintf("%d unresolvable data asset(s)", len(details)),
+		strings.Join(lines, "\n"),
+	)
 }
 
 func (r *DataProductResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -197,7 +294,7 @@ func (r *DataProductResource) Create(ctx context.Context, req resource.CreateReq
 			// Add the mapped asset to the list
 			dataAssets = append(dataAssets, mappedAsset)
 		}
-		state.DataAssets = dataAssets
+		state.DataAssets = normalizeDataAssets(dataAssets)
 	} else {
 		state.DataAssets = []DataProductAssetResourceModel{}
 	}
@@ -216,8 +313,8 @@ func (r *DataProductResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	// Get data product by UUID
-	productResponse, err := r.client.GetDataProduct(plan.UUID.ValueString())
+	// Get data product by UUID (using in-memory cache)
+	productResponse, err := r.client.GetCachedOrFetchDataProduct(plan.UUID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read data product, got error: %s", err))
 		return
@@ -241,16 +338,20 @@ func (r *DataProductResource) Read(ctx context.Context, req resource.ReadRequest
 	if len(productResponse.DataAssets) > 0 {
 		dataAssets := make([]DataProductAssetResourceModel, 0, len(productResponse.DataAssets))
 		for _, asset := range productResponse.DataAssets {
-			dataAssets = append(dataAssets, DataProductAssetResourceModel{
+			mappedAsset := DataProductAssetResourceModel{
 				Type:      asset.Type,
 				UUID:      types.StringValue(asset.UUID),
 				Project:   types.StringValue(asset.Project),
 				Dataset:   types.StringValue(asset.Dataset),
-				Table:     types.StringValue(asset.Table),
+				Table:     types.StringNull(),
 				AlertType: types.StringValue(string(asset.AlertType)),
-			})
+			}
+			if asset.Table != "" {
+				mappedAsset.Table = types.StringValue(asset.Table)
+			}
+			dataAssets = append(dataAssets, mappedAsset)
 		}
-		state.DataAssets = dataAssets
+		state.DataAssets = normalizeDataAssets(dataAssets)
 	} else {
 		state.DataAssets = []DataProductAssetResourceModel{}
 	}
@@ -332,7 +433,7 @@ func (r *DataProductResource) Update(ctx context.Context, req resource.UpdateReq
 			// Add the mapped asset to the list
 			dataAssets = append(dataAssets, mappedAsset)
 		}
-		state.DataAssets = dataAssets
+		state.DataAssets = normalizeDataAssets(dataAssets)
 	} else {
 		state.DataAssets = []DataProductAssetResourceModel{}
 	}

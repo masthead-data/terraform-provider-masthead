@@ -17,7 +17,7 @@ Manages a Masthead data product
 
 ### Required
 
-- `data_assets` (Attributes List) List of data assets associated with this data product (see [below for nested schema](#nestedatt--data_assets))
+- `data_assets` (Attributes Set) Set of data assets associated with this data product (see [below for nested schema](#nestedatt--data_assets))
 - `name` (String) Name of the data product
 
 ### Optional

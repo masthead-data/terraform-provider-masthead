@@ -3,6 +3,7 @@ package masthead
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -76,6 +77,16 @@ func (c *Client) CreateDataProduct(dataProduct DataProduct) (*DataProduct, error
 		return nil, fmt.Errorf("error: %v. %v", productResponse.Error, productResponse.Message)
 	}
 
+	if productResponse.DataProduct.UUID == "" {
+		return nil, ErrEmptyValue
+	}
+
+	c.cacheMutex.Lock()
+	if c.productsCache != nil {
+		c.productsCache[productResponse.DataProduct.UUID] = &productResponse.DataProduct
+	}
+	c.cacheMutex.Unlock()
+
 	return &productResponse.DataProduct, nil
 }
 
@@ -101,7 +112,49 @@ func (c *Client) GetDataProduct(productID string) (*DataProduct, error) {
 		return nil, err
 	}
 
+	if productResponse.DataProduct.UUID == "" {
+		return nil, ErrEmptyValue
+	}
+
 	return &productResponse.DataProduct, nil
+}
+
+// GetCachedOrFetchDataProduct retrieves a product from the in-memory cache, bulk-populating
+// the cache on the first call via ListDataProducts().
+func (c *Client) GetCachedOrFetchDataProduct(productID string) (*DataProduct, error) {
+	c.cacheMutex.RLock()
+	if c.productsWarmed {
+		p, found := c.productsCache[productID]
+		c.cacheMutex.RUnlock()
+		if found {
+			return p, nil
+		}
+		// If not in cache, fallback to GetDataProduct
+		return c.GetDataProduct(productID)
+	}
+	c.cacheMutex.RUnlock()
+
+	// Warm cache under write lock
+	c.cacheMutex.Lock()
+	if !c.productsWarmed {
+		// Mark the bulk warm-up as attempted regardless of outcome. If the list call
+		// is left un-flagged on failure, every subsequent read re-runs the full
+		// paginated list under this write lock before falling back — strictly worse
+		// than going straight to the per-UUID fetch below.
+		c.productsWarmed = true
+		if allProducts, err := c.ListDataProducts(); err == nil {
+			for i := range allProducts {
+				c.productsCache[allProducts[i].UUID] = &allProducts[i]
+			}
+		}
+	}
+	p, found := c.productsCache[productID]
+	c.cacheMutex.Unlock()
+
+	if found {
+		return p, nil
+	}
+	return c.GetDataProduct(productID)
 }
 
 // UpdateDataProduct - Update an existing data product
@@ -131,6 +184,16 @@ func (c *Client) UpdateDataProduct(dataProduct DataProduct) (*DataProduct, error
 		return nil, err
 	}
 
+	if productResponse.DataProduct.UUID == "" {
+		return nil, ErrEmptyValue
+	}
+
+	c.cacheMutex.Lock()
+	if c.productsCache != nil {
+		c.productsCache[productResponse.DataProduct.UUID] = &productResponse.DataProduct
+	}
+	c.cacheMutex.Unlock()
+
 	return &productResponse.DataProduct, nil
 }
 
@@ -144,5 +207,57 @@ func (c *Client) DeleteDataProduct(productID string) error {
 	}
 
 	_, err = c.doRequest(req)
-	return err
+	if err != nil {
+		return err
+	}
+
+	c.cacheMutex.Lock()
+	if c.productsCache != nil {
+		delete(c.productsCache, productID)
+	}
+	c.cacheMutex.Unlock()
+
+	return nil
+}
+
+// ValidateDataProduct dry-runs asset validation server-side. supported=false
+// means the backend has no validate endpoint (pre-rollout) — callers should
+// skip plan-time validation, not fail.
+func (c *Client) ValidateDataProduct(dataProduct DataProduct) ([]APIErrorDetail, bool, error) {
+	rb, err := json.Marshal(dataProduct)
+	if err != nil {
+		return nil, false, err
+	}
+	req, err := http.NewRequest("POST",
+		fmt.Sprintf("%s/clientApi/data-product/validate", c.HostURL),
+		strings.NewReader(string(rb)))
+	if err != nil {
+		return nil, false, err
+	}
+	if c.Token != "" {
+		req.Header.Set("X-API-TOKEN", c.Token)
+		req.Header.Set("Content-Type", "application/json")
+	}
+	res, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, false, err
+	}
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, false, err
+	}
+	if res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusMethodNotAllowed {
+		return nil, false, nil
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, true, formatAPIError(res.StatusCode, body)
+	}
+	var parsed struct {
+		Values []APIErrorDetail `json:"values"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil, true, err
+	}
+	return parsed.Values, true, nil
 }

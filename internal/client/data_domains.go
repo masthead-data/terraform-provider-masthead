@@ -13,7 +13,10 @@ func (c *Client) ListDomains() ([]DataDomain, error) {
 	page := 1
 
 	for {
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s/clientApi/data-domain/list?page=%d",
+		// limit must be sent alongside page: the API forwards the pair only when both
+		// are present, otherwise it silently falls back to page=1 and returns the same
+		// first page on every iteration.
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s/clientApi/data-domain/list?page=%d&limit=100",
 			c.HostURL, page), nil)
 		if err != nil {
 			return nil, err
@@ -71,6 +74,16 @@ func (c *Client) CreateDomain(dataDomain DataDomain) (*DataDomain, error) {
 		return nil, fmt.Errorf("error: %v. %v", dataDomainResponse.Error, dataDomainResponse.Message)
 	}
 
+	if dataDomainResponse.DataDomain.UUID == "" {
+		return nil, ErrEmptyValue
+	}
+
+	c.cacheMutex.Lock()
+	if c.domainsCache != nil {
+		c.domainsCache[dataDomainResponse.DataDomain.UUID] = &dataDomainResponse.DataDomain
+	}
+	c.cacheMutex.Unlock()
+
 	return &dataDomainResponse.DataDomain, nil
 }
 
@@ -97,7 +110,47 @@ func (c *Client) GetDomain(dataDomainID string) (*DataDomain, error) {
 		return nil, fmt.Errorf("error: %v. %v", dataDomainResponse.Error, dataDomainResponse.Message)
 	}
 
+	if dataDomainResponse.DataDomain.UUID == "" {
+		return nil, ErrEmptyValue
+	}
+
 	return &dataDomainResponse.DataDomain, nil
+}
+
+// GetCachedOrFetchDomain retrieves a domain from in-memory cache, bulk-populating
+// the cache on first call via ListDomains().
+func (c *Client) GetCachedOrFetchDomain(dataDomainID string) (*DataDomain, error) {
+	c.cacheMutex.RLock()
+	if c.domainsWarmed {
+		d, found := c.domainsCache[dataDomainID]
+		c.cacheMutex.RUnlock()
+		if found {
+			return d, nil
+		}
+		return c.GetDomain(dataDomainID)
+	}
+	c.cacheMutex.RUnlock()
+
+	c.cacheMutex.Lock()
+	if !c.domainsWarmed {
+		// Mark the bulk warm-up as attempted regardless of outcome. If the list call
+		// is left un-flagged on failure, every subsequent read re-runs the full
+		// paginated list under this write lock before falling back — strictly worse
+		// than going straight to the per-UUID fetch below.
+		c.domainsWarmed = true
+		if allDomains, err := c.ListDomains(); err == nil {
+			for i := range allDomains {
+				c.domainsCache[allDomains[i].UUID] = &allDomains[i]
+			}
+		}
+	}
+	d, found := c.domainsCache[dataDomainID]
+	c.cacheMutex.Unlock()
+
+	if found {
+		return d, nil
+	}
+	return c.GetDomain(dataDomainID)
 }
 
 // UpdateDomain - Update an existing data domain
@@ -132,6 +185,16 @@ func (c *Client) UpdateDomain(dataDomain DataDomain) (*DataDomain, error) {
 		return nil, fmt.Errorf("error: %v. %v", domainResponse.Error, domainResponse.Message)
 	}
 
+	if domainResponse.DataDomain.UUID == "" {
+		return nil, ErrEmptyValue
+	}
+
+	c.cacheMutex.Lock()
+	if c.domainsCache != nil {
+		c.domainsCache[domainResponse.DataDomain.UUID] = &domainResponse.DataDomain
+	}
+	c.cacheMutex.Unlock()
+
 	return &domainResponse.DataDomain, nil
 }
 
@@ -145,5 +208,15 @@ func (c *Client) DeleteDomain(domainID string) error {
 	}
 
 	_, err = c.doRequest(req)
-	return err
+	if err != nil {
+		return err
+	}
+
+	c.cacheMutex.Lock()
+	if c.domainsCache != nil {
+		delete(c.domainsCache, domainID)
+	}
+	c.cacheMutex.Unlock()
+
+	return nil
 }
