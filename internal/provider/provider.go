@@ -152,5 +152,6 @@ func (p *mastheadProvider) DataSources(ctx context.Context) []func() datasource.
 		NewUserDataSource,
 		NewDataDomainDataSource,
 		NewDataProductDataSource,
+		NewDataScanDataSource,
 	}
 }

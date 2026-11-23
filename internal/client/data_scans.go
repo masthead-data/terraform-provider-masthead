@@ -188,3 +188,25 @@ func (c *Client) DeleteDataScan(id int64) error {
 	}
 	return unavailable(body)
 }
+
+// ListDataScans returns the tenant's data scans, ordered by name.
+func (c *Client) ListDataScans() ([]DataScan, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/clientApi/data-scans/list", c.HostURL), nil)
+	if err != nil {
+		return nil, err
+	}
+	body, err := c.doRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	if err := unavailable(body); err != nil {
+		return nil, err
+	}
+	out := struct {
+		Values []DataScan `json:"values"`
+	}{}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, err
+	}
+	return out.Values, nil
+}
