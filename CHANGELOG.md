@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`masthead_data_scan` resource**: manages Masthead data scans through `/clientApi/data-scans`. A create dry-runs the scan first, so contract errors fail the apply before anything is created. `name`, `table` and `frequency` force replacement (the API resets history when they change); `description`, `process_delay_hours` and `active` update in place. Import by scan ID.
+
 ### Changed
 
 ### Deprecated

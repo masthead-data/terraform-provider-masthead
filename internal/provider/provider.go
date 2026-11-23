@@ -143,6 +143,7 @@ func (p *mastheadProvider) Resources(ctx context.Context) []func() resource.Reso
 		NewUserResource,
 		NewDataDomainResource,
 		NewDataProductResource,
+		NewDataScanResource,
 	}
 }
 
