@@ -32,7 +32,7 @@ func TestCreateDataScanDryRunThenCreate(t *testing.T) {
 	c := newScanTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		var got DataScanCreateRequest
-		if err := json.Unmarshal(body, &got); err != nil || got.Frequency != "DAILY" {
+		if err := json.Unmarshal(body, &got); err != nil || got.Frequency == nil || *got.Frequency != "DAILY" {
 			t.Errorf("body %s: want frequency DAILY", body)
 		}
 		if r.Header.Get("X-API-TOKEN") != "test-token" {
@@ -46,7 +46,8 @@ func TestCreateDataScanDryRunThenCreate(t *testing.T) {
 		_, _ = w.Write([]byte(`{"summary":{"table":"p.dq.orders"},"scan":` + scanJSON + `}`))
 	})
 
-	req := DataScanCreateRequest{Table: "p.dq.orders", Name: "Orders nulls", Frequency: "DAILY"}
+	daily := "DAILY"
+	req := DataScanCreateRequest{Table: "p.dq.orders", Name: "Orders nulls", Frequency: &daily}
 	summary, err := c.ValidateDataScan(req)
 	if err != nil || summary.Series != 12 || len(summary.Warnings) != 1 {
 		t.Fatalf("validate: %+v, %v", summary, err)
@@ -112,8 +113,8 @@ func TestCreateDataScanSendsTypeSeverityLabels(t *testing.T) {
 		_, _ = w.Write([]byte(`{"summary":{"table":"p.dq.orders"},"scan":` +
 			strings.Replace(scanJSON, `"source":"API"`, `"source":"API","severity":"P2","labels":{"owner":"data-ops"}`, 1) + `}`))
 	})
-	threshold, severity := "ANALYSIS_WITH_THRESHOLD", "P2"
-	scan, _, err := c.CreateDataScan(DataScanCreateRequest{Table: "p.dq.orders", Name: "Orders nulls", Frequency: "DAILY",
+	threshold, severity, daily := "ANALYSIS_WITH_THRESHOLD", "P2", "DAILY"
+	scan, _, err := c.CreateDataScan(DataScanCreateRequest{Table: "p.dq.orders", Name: "Orders nulls", Frequency: &daily,
 		Type: &threshold, Severity: &severity, Labels: map[string]string{"owner": "data-ops"}})
 	if err != nil || scan.Severity == nil || *scan.Severity != "P2" || scan.Labels["owner"] != "data-ops" {
 		t.Fatalf("create: %+v, %v", scan, err)
@@ -143,5 +144,27 @@ func TestUpdateDataScanSeverity(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+// A create with a schedule sends it with its zone and no frequency; the response carries the schedule back.
+func TestCreateDataScanSendsSchedule(t *testing.T) {
+	c := newScanTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		want := `{"table":"p.dq.orders","name":"Orders nulls","schedule":"0 0 * * SUN-FRI","scheduleTimezone":"Europe/Kyiv"}`
+		if string(body) != want {
+			t.Errorf("body %s, want %s", body, want)
+		}
+		_, _ = w.Write([]byte(`{"summary":{"table":"p.dq.orders"},"scan":` + strings.Replace(scanJSON, `"frequency":86400`,
+			`"frequency":86400,"schedule":"0 0 * * SUN-FRI","scheduleTimezone":"Europe/Kyiv"`, 1) + `}`))
+	})
+	schedule, zone := "0 0 * * SUN-FRI", "Europe/Kyiv"
+	scan, _, err := c.CreateDataScan(DataScanCreateRequest{Table: "p.dq.orders", Name: "Orders nulls", Schedule: &schedule,
+		ScheduleTimezone: &zone})
+	if err != nil || scan.Schedule != schedule || scan.ScheduleTimezone != zone || DataScanScheduleFrequency(scan.Schedule, scan.ScheduleTimezone) != "" {
+		t.Fatalf("create: %+v, %v", scan, err)
+	}
+	if DataScanScheduleFrequency("0 0 * * *", "UTC") != "DAILY" || DataScanScheduleFrequency("0 0 * * *", "Europe/Kyiv") != "" {
+		t.Fatal("shorthand mapping")
 	}
 }

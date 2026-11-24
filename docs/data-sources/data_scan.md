@@ -30,10 +30,12 @@ data "masthead_data_scan" "orders" {
 
 - `active` (Boolean) Whether the scan runs.
 - `description` (String) What the scan checks.
-- `frequency` (String) How often Masthead checks the scan, for example `DAILY`.
+- `frequency` (String) The fixed frequency the schedule is the shorthand of, for example `DAILY`, or empty.
 - `labels` (Map of String) Key/value labels.
 - `process_delay_hours` (Number) Hours after a period closes before it is checked.
 - `project` (String) Project of the scan table.
+- `schedule` (String) Cron whose ticks cut the scan's periods, for example `0 0 * * *`.
+- `schedule_timezone` (String) IANA time zone of the schedule.
 - `severity` (String) Severity of the scan's incidents, `P1`-`P5`, or empty.
 - `source` (String) `API` or `MANUAL` (set up by Masthead).
 - `table` (String) Scan table, `project.dataset.table`. Empty for some scans set up by Masthead.

@@ -24,6 +24,28 @@ var DataScanTypes = []string{"ANALYSIS", "ANALYSIS_WITH_THRESHOLD"}
 // DataScanSeverities are the severities a scan can give its incidents, as on Masthead incidents.
 var DataScanSeverities = []string{"P1", "P2", "P3", "P4", "P5"}
 
+// DataScanFrequencyCrons maps each frequency name to the UTC cron it is the shorthand of.
+var DataScanFrequencyCrons = map[string]string{
+	"HOURLY":         "0 * * * *",
+	"EVERY_6_HOURS":  "0 */6 * * *",
+	"EVERY_12_HOURS": "0 */12 * * *",
+	"DAILY":          "0 0 * * *",
+}
+
+// DataScanScheduleFrequency returns the frequency name a UTC schedule is the shorthand of, or "" for any other
+// schedule.
+func DataScanScheduleFrequency(schedule, timezone string) string {
+	if timezone != "UTC" {
+		return ""
+	}
+	for name, cron := range DataScanFrequencyCrons {
+		if cron == schedule {
+			return name
+		}
+	}
+	return ""
+}
+
 // DataScanFrequencyName returns the API name of a period in seconds, or "" if there is none.
 func DataScanFrequencyName(seconds int64) string {
 	for name, s := range DataScanFrequencies {
@@ -43,6 +65,8 @@ type DataScan struct {
 	Table                  *string           `json:"table"`
 	Type                   string            `json:"type"`
 	Frequency              int64             `json:"frequency"`
+	Schedule               string            `json:"schedule"`
+	ScheduleTimezone       string            `json:"scheduleTimezone"`
 	ProcessDelayHours      int64             `json:"processDelayHours"`
 	IsActive               bool              `json:"isActive"`
 	Source                 string            `json:"source"`
@@ -69,7 +93,9 @@ type DataScanSummary struct {
 type DataScanCreateRequest struct {
 	Table             string            `json:"table"`
 	Name              string            `json:"name"`
-	Frequency         string            `json:"frequency"`
+	Frequency         *string           `json:"frequency,omitempty"`
+	Schedule          *string           `json:"schedule,omitempty"`
+	ScheduleTimezone  *string           `json:"scheduleTimezone,omitempty"`
 	ProcessDelayHours *int64            `json:"processDelayHours,omitempty"`
 	Description       *string           `json:"description,omitempty"`
 	Type              *string           `json:"type,omitempty"`

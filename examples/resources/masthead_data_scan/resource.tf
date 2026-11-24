@@ -22,3 +22,12 @@ resource "masthead_data_scan" "orders_null_limits" {
     owner      = "data-ops"
   }
 }
+
+# A schedule instead of a fixed frequency: the cron's ticks cut the periods. This source isn't loaded on
+# Saturdays, so Friday's period runs from Friday 00:00 to Sunday 00:00 (Paris time) and no Saturday is missing.
+resource "masthead_data_scan" "store_sales" {
+  name              = "Store sales: daily volume"
+  table             = "my-project.masthead_dq.store_sales_volume"
+  schedule          = "0 0 * * SUN-FRI"
+  schedule_timezone = "Europe/Paris"
+}

@@ -46,6 +46,8 @@ type DataScanResourceModel struct {
 	Description       types.String `tfsdk:"description"`
 	Table             types.String `tfsdk:"table"`
 	Frequency         types.String `tfsdk:"frequency"`
+	Schedule          types.String `tfsdk:"schedule"`
+	ScheduleTimezone  types.String `tfsdk:"schedule_timezone"`
 	ProcessDelayHours types.Int64  `tfsdk:"process_delay_hours"`
 	Active            types.Bool   `tfsdk:"active"`
 	Project           types.String `tfsdk:"project"`
@@ -82,8 +84,8 @@ func (r *DataScanResource) Schema(ctx context.Context, req resource.SchemaReques
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a Masthead data scan: a BigQuery table of metric rows (`table_reference`, `rule_name`, " +
 			"`timestamp`, `value`) that Masthead checks for anomalies every period. Creating a scan first dry-runs it, " +
-			"so contract errors fail the apply before anything is created. Changing `name`, `table`, `frequency`, " +
-			"`type` or `labels` replaces the scan, which drops its history and incidents.",
+			"so contract errors fail the apply before anything is created. Changing `name`, `table`, `schedule`, " +
+			"`schedule_timezone`, `frequency`, `type` or `labels` replaces the scan, which drops its history and incidents.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Scan ID.",
@@ -105,11 +107,40 @@ func (r *DataScanResource) Schema(ctx context.Context, req resource.SchemaReques
 				Required:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
+			"schedule": schema.StringAttribute{
+				MarkdownDescription: "When periods start and end: a five-field cron (minute hour day-of-month month " +
+					"day-of-week) or `@hourly`, `@daily`, `@weekly`, `@monthly`. Each period runs from one tick to the " +
+					"next and has one row per metric: `0 0 * * SUN-FRI` makes Friday's period Friday plus Saturday, " +
+					"`0 0 * * MON` is weekly, `0 0 1 * *` monthly, `0 4,6,15 * * *` three periods a day. Periods are " +
+					"1 hour to 31 days. Set this or `frequency`; read back when `frequency` is set. Changing it " +
+					"replaces the scan.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"schedule_timezone": schema.StringAttribute{
+				MarkdownDescription: "IANA time zone the schedule runs in, for example `Europe/Paris`. Defaults to `UTC`. " +
+					"Changing it replaces the scan.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
 			"frequency": schema.StringAttribute{
-				MarkdownDescription: "How often Masthead checks the scan: one of `" + strings.Join(frequencyNames(), "`, `") +
-					"`. Changing it replaces the scan.",
-				Required:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				MarkdownDescription: "Shorthand for a UTC `schedule`: one of `" + strings.Join(frequencyNames(), "`, `") +
+					"` (`DAILY` is midnight UTC). Set this or `schedule`; read back as the frequency the schedule is " +
+					"the shorthand of, or empty for any other schedule. Changing it replaces the scan.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"process_delay_hours": schema.Int64Attribute{
 				MarkdownDescription: "Hours to wait after a period closes before checking it, 0-24. Defaults to a value " +
@@ -177,6 +208,18 @@ func (r *DataScanResource) ValidateConfig(ctx context.Context, req resource.Vali
 			resp.Diagnostics.AddAttributeError(path.Root("table"), "Invalid table", "Use project.dataset.table.")
 		}
 	}
+	if !cfg.Schedule.IsUnknown() && !cfg.Frequency.IsUnknown() {
+		switch {
+		case cfg.Schedule.IsNull() && cfg.Frequency.IsNull():
+			resp.Diagnostics.AddAttributeError(path.Root("schedule"), "Missing schedule", "Set schedule or frequency.")
+		case !cfg.Schedule.IsNull() && !cfg.Frequency.IsNull():
+			resp.Diagnostics.AddAttributeError(path.Root("frequency"), "Conflicting schedule",
+				"Set schedule or frequency, not both.")
+		}
+	}
+	if !cfg.Schedule.IsUnknown() && !cfg.Schedule.IsNull() && strings.TrimSpace(cfg.Schedule.ValueString()) == "" {
+		resp.Diagnostics.AddAttributeError(path.Root("schedule"), "Invalid schedule", "The schedule is empty.")
+	}
 	if !cfg.Frequency.IsUnknown() && !cfg.Frequency.IsNull() {
 		if _, ok := masthead.DataScanFrequencies[cfg.Frequency.ValueString()]; !ok {
 			resp.Diagnostics.AddAttributeError(path.Root("frequency"), "Invalid frequency",
@@ -243,10 +286,13 @@ func toState(scan *masthead.DataScan, m *DataScanResourceModel) {
 	if scan.Table != nil {
 		m.Table = types.StringValue(*scan.Table)
 	}
-	if name := masthead.DataScanFrequencyName(scan.Frequency); name != "" {
+	m.Schedule = types.StringValue(scan.Schedule)
+	m.ScheduleTimezone = types.StringValue(scan.ScheduleTimezone)
+	// the frequency a UTC schedule is the shorthand of; null for a custom schedule
+	if name := masthead.DataScanScheduleFrequency(scan.Schedule, scan.ScheduleTimezone); name != "" {
 		m.Frequency = types.StringValue(name)
 	} else {
-		m.Frequency = types.StringValue(strconv.FormatInt(scan.Frequency, 10))
+		m.Frequency = types.StringNull()
 	}
 	m.ProcessDelayHours = types.Int64Value(scan.ProcessDelayHours)
 	m.Active = types.BoolValue(scan.IsActive)
@@ -266,6 +312,14 @@ func toState(scan *masthead.DataScan, m *DataScanResourceModel) {
 	m.Source = types.StringValue(scan.Source)
 }
 
+// optionalString is the value of a planned attribute, or nil when it is null or not known yet.
+func optionalString(v types.String) *string {
+	if v.IsNull() || v.IsUnknown() {
+		return nil
+	}
+	return v.ValueStringPointer()
+}
+
 func parseID(id string) (int64, error) {
 	v, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
@@ -282,10 +336,12 @@ func (r *DataScanResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	body := masthead.DataScanCreateRequest{
-		Table:       plan.Table.ValueString(),
-		Name:        plan.Name.ValueString(),
-		Frequency:   plan.Frequency.ValueString(),
-		Description: plan.Description.ValueStringPointer(),
+		Table:            plan.Table.ValueString(),
+		Name:             plan.Name.ValueString(),
+		Frequency:        optionalString(plan.Frequency),
+		Schedule:         optionalString(plan.Schedule),
+		ScheduleTimezone: optionalString(plan.ScheduleTimezone),
+		Description:      plan.Description.ValueStringPointer(),
 	}
 	if !plan.ProcessDelayHours.IsUnknown() && !plan.ProcessDelayHours.IsNull() {
 		body.ProcessDelayHours = plan.ProcessDelayHours.ValueInt64Pointer()
@@ -377,7 +433,8 @@ func (r *DataScanResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	// name, table, frequency, type and labels force replacement, so only these can change here.
+	// name, table, schedule, schedule_timezone, frequency, type and labels force replacement, so only these can
+	// change here.
 	update := masthead.DataScanUpdateRequest{Active: plan.Active.ValueBoolPointer()}
 	if !plan.Description.Equal(state.Description) {
 		d := plan.Description.ValueString() // null config clears the description
