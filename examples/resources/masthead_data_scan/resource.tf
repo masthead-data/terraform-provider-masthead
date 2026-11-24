@@ -7,3 +7,18 @@ resource "masthead_data_scan" "orders_nulls" {
   frequency           = "DAILY"
   process_delay_hours = 6
 }
+
+# Fixed limits instead of a learned range: each row of the scan table also has lower_threshold and
+# upper_threshold (an empty one means no limit on that side). Incidents get severity P2.
+resource "masthead_data_scan" "orders_null_limits" {
+  name        = "Orders: null rate limits"
+  description = "Null rate at most 3% per column; a breach is a P2 incident"
+  table       = "my-project.masthead_dq.orders_null_limits"
+  frequency   = "DAILY"
+  type        = "ANALYSIS_WITH_THRESHOLD"
+  severity    = "P2"
+  labels = {
+    managed_by = "terraform"
+    owner      = "data-ops"
+  }
+}

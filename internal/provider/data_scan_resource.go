@@ -3,16 +3,21 @@ package provider
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	masthead "github.com/masthead-data/terraform-provider-masthead/internal/client"
@@ -45,8 +50,18 @@ type DataScanResourceModel struct {
 	Active            types.Bool   `tfsdk:"active"`
 	Project           types.String `tfsdk:"project"`
 	Type              types.String `tfsdk:"type"`
+	Severity          types.String `tfsdk:"severity"`
+	Labels            types.Map    `tfsdk:"labels"`
 	Source            types.String `tfsdk:"source"`
 }
+
+// Label rules, as data-scan-agent checks them (the Google Cloud label rules).
+var (
+	labelKeyPattern   = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,62}$`)
+	labelValuePattern = regexp.MustCompile(`^[a-z0-9_-]{0,63}$`)
+)
+
+const labelsMax = 64
 
 func (r *DataScanResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_data_scan"
@@ -67,8 +82,8 @@ func (r *DataScanResource) Schema(ctx context.Context, req resource.SchemaReques
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a Masthead data scan: a BigQuery table of metric rows (`table_reference`, `rule_name`, " +
 			"`timestamp`, `value`) that Masthead checks for anomalies every period. Creating a scan first dry-runs it, " +
-			"so contract errors fail the apply before anything is created. Changing `name`, `table` or `frequency` " +
-			"replaces the scan, which drops its history and incidents.",
+			"so contract errors fail the apply before anything is created. Changing `name`, `table`, `frequency`, " +
+			"`type` or `labels` replaces the scan, which drops its history and incidents.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Scan ID.",
@@ -115,9 +130,27 @@ func (r *DataScanResource) Schema(ctx context.Context, req resource.SchemaReques
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"type": schema.StringAttribute{
-				MarkdownDescription: "How Masthead evaluates the rows, for example `ANALYSIS` (learned expected range).",
-				Computed:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				MarkdownDescription: "How Masthead evaluates the rows: `ANALYSIS` (the default; Masthead learns each metric's " +
+					"normal range) or `ANALYSIS_WITH_THRESHOLD` (each row sets its own limits in `lower_threshold` and " +
+					"`upper_threshold`; an empty one means no limit on that side). Changing it replaces the scan.",
+				Optional:      true,
+				Computed:      true,
+				Default:       stringdefault.StaticString("ANALYSIS"),
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"severity": schema.StringAttribute{
+				MarkdownDescription: "Severity of every incident the scan opens: one of `" +
+					strings.Join(masthead.DataScanSeverities, "`, `") + "`. A change applies to new incidents. " +
+					"Leave it out for no severity. Updated in place.",
+				Optional: true,
+			},
+			"labels": schema.MapAttribute{
+				MarkdownDescription: "Key/value labels, for example for ownership. Keys: up to 63 lowercase letters, digits, " +
+					"`_` and `-`, starting with a letter; values: up to 63 of the same characters. At most 64 labels. " +
+					"Labels are set when the scan is created, so changing them replaces the scan.",
+				ElementType:   types.StringType,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Map{mapplanmodifier.RequiresReplace()},
 			},
 			"source": schema.StringAttribute{
 				MarkdownDescription: "Who set the scan up: `API` for scans created through the API, `MANUAL` for scans set up by Masthead.",
@@ -153,6 +186,32 @@ func (r *DataScanResource) ValidateConfig(ctx context.Context, req resource.Vali
 	if !cfg.ProcessDelayHours.IsUnknown() && !cfg.ProcessDelayHours.IsNull() {
 		if d := cfg.ProcessDelayHours.ValueInt64(); d < 0 || d > 24 {
 			resp.Diagnostics.AddAttributeError(path.Root("process_delay_hours"), "Invalid process_delay_hours", "Use 0-24.")
+		}
+	}
+	if !cfg.Type.IsUnknown() && !cfg.Type.IsNull() && !slices.Contains(masthead.DataScanTypes, cfg.Type.ValueString()) {
+		resp.Diagnostics.AddAttributeError(path.Root("type"), "Invalid type",
+			fmt.Sprintf("Use one of %s.", strings.Join(masthead.DataScanTypes, ", ")))
+	}
+	if !cfg.Severity.IsUnknown() && !cfg.Severity.IsNull() && !slices.Contains(masthead.DataScanSeverities, cfg.Severity.ValueString()) {
+		resp.Diagnostics.AddAttributeError(path.Root("severity"), "Invalid severity",
+			fmt.Sprintf("Use one of %s.", strings.Join(masthead.DataScanSeverities, ", ")))
+	}
+	if !cfg.Labels.IsUnknown() && !cfg.Labels.IsNull() {
+		labels := map[string]types.String{}
+		resp.Diagnostics.Append(cfg.Labels.ElementsAs(ctx, &labels, false)...)
+		if len(labels) > labelsMax {
+			resp.Diagnostics.AddAttributeError(path.Root("labels"), "Too many labels",
+				fmt.Sprintf("A scan can have at most %d labels, got %d.", labelsMax, len(labels)))
+		}
+		for key, value := range labels {
+			if !labelKeyPattern.MatchString(key) {
+				resp.Diagnostics.AddAttributeError(path.Root("labels"), "Invalid label key",
+					fmt.Sprintf("%q: keys are up to 63 lowercase letters, digits, _ and -, starting with a letter.", key))
+			}
+			if !value.IsUnknown() && !labelValuePattern.MatchString(value.ValueString()) {
+				resp.Diagnostics.AddAttributeError(path.Root("labels"), "Invalid label value",
+					fmt.Sprintf("%q: values are up to 63 lowercase letters, digits, _ and -.", value.ValueString()))
+			}
 		}
 	}
 }
@@ -193,6 +252,17 @@ func toState(scan *masthead.DataScan, m *DataScanResourceModel) {
 	m.Active = types.BoolValue(scan.IsActive)
 	m.Project = types.StringValue(scan.Project)
 	m.Type = types.StringValue(scan.Type)
+	m.Severity = types.StringPointerValue(scan.Severity)
+	// no labels reads as null, so a config without labels shows no diff
+	if len(scan.Labels) == 0 {
+		m.Labels = types.MapNull(types.StringType)
+	} else {
+		labels := make(map[string]attr.Value, len(scan.Labels))
+		for k, v := range scan.Labels {
+			labels[k] = types.StringValue(v)
+		}
+		m.Labels = types.MapValueMust(types.StringType, labels)
+	}
 	m.Source = types.StringValue(scan.Source)
 }
 
@@ -219,6 +289,16 @@ func (r *DataScanResource) Create(ctx context.Context, req resource.CreateReques
 	}
 	if !plan.ProcessDelayHours.IsUnknown() && !plan.ProcessDelayHours.IsNull() {
 		body.ProcessDelayHours = plan.ProcessDelayHours.ValueInt64Pointer()
+	}
+	if !plan.Type.IsUnknown() && !plan.Type.IsNull() {
+		body.Type = plan.Type.ValueStringPointer()
+	}
+	body.Severity = plan.Severity.ValueStringPointer()
+	if !plan.Labels.IsNull() && !plan.Labels.IsUnknown() {
+		resp.Diagnostics.Append(plan.Labels.ElementsAs(ctx, &body.Labels, false)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 
 	// Dry run first: contract errors (missing access, wrong columns, too little history) fail here,
@@ -297,7 +377,7 @@ func (r *DataScanResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	// name, table and frequency force replacement, so only these can change here.
+	// name, table, frequency, type and labels force replacement, so only these can change here.
 	update := masthead.DataScanUpdateRequest{Active: plan.Active.ValueBoolPointer()}
 	if !plan.Description.Equal(state.Description) {
 		d := plan.Description.ValueString() // null config clears the description
@@ -305,6 +385,9 @@ func (r *DataScanResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 	if !plan.ProcessDelayHours.IsUnknown() && !plan.ProcessDelayHours.IsNull() {
 		update.ProcessDelayHours = plan.ProcessDelayHours.ValueInt64Pointer()
+	}
+	if !plan.Severity.Equal(state.Severity) {
+		update.Severity = masthead.DataScanSeverityUpdate(plan.Severity.ValueStringPointer()) // null config removes it
 	}
 
 	scan, err := r.client.UpdateDataScan(id, update)

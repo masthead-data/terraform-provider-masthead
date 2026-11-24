@@ -3,12 +3,12 @@
 page_title: "masthead_data_scan Resource - masthead"
 subcategory: ""
 description: |-
-  Manages a Masthead data scan: a BigQuery table of metric rows (table_reference, rule_name, timestamp, value) that Masthead checks for anomalies every period. Creating a scan first dry-runs it, so contract errors fail the apply before anything is created. Changing name, table or frequency replaces the scan, which drops its history and incidents.
+  Manages a Masthead data scan: a BigQuery table of metric rows (table_reference, rule_name, timestamp, value) that Masthead checks for anomalies every period. Creating a scan first dry-runs it, so contract errors fail the apply before anything is created. Changing name, table, frequency, type or labels replaces the scan, which drops its history and incidents.
 ---
 
 # masthead_data_scan (Resource)
 
-Manages a Masthead data scan: a BigQuery table of metric rows (`table_reference`, `rule_name`, `timestamp`, `value`) that Masthead checks for anomalies every period. Creating a scan first dry-runs it, so contract errors fail the apply before anything is created. Changing `name`, `table` or `frequency` replaces the scan, which drops its history and incidents.
+Manages a Masthead data scan: a BigQuery table of metric rows (`table_reference`, `rule_name`, `timestamp`, `value`) that Masthead checks for anomalies every period. Creating a scan first dry-runs it, so contract errors fail the apply before anything is created. Changing `name`, `table`, `frequency`, `type` or `labels` replaces the scan, which drops its history and incidents.
 
 ## Example Usage
 
@@ -21,6 +21,21 @@ resource "masthead_data_scan" "orders_nulls" {
   table               = "my-project.masthead_dq.orders_columns"
   frequency           = "DAILY"
   process_delay_hours = 6
+}
+
+# Fixed limits instead of a learned range: each row of the scan table also has lower_threshold and
+# upper_threshold (an empty one means no limit on that side). Incidents get severity P2.
+resource "masthead_data_scan" "orders_null_limits" {
+  name        = "Orders: null rate limits"
+  description = "Null rate at most 3% per column; a breach is a P2 incident"
+  table       = "my-project.masthead_dq.orders_null_limits"
+  frequency   = "DAILY"
+  type        = "ANALYSIS_WITH_THRESHOLD"
+  severity    = "P2"
+  labels = {
+    managed_by = "terraform"
+    owner      = "data-ops"
+  }
 }
 ```
 
@@ -37,14 +52,16 @@ resource "masthead_data_scan" "orders_nulls" {
 
 - `active` (Boolean) `false` pauses the scan. Defaults to `true`. Updated in place.
 - `description` (String) What the scan checks. Updated in place.
+- `labels` (Map of String) Key/value labels, for example for ownership. Keys: up to 63 lowercase letters, digits, `_` and `-`, starting with a letter; values: up to 63 of the same characters. At most 64 labels. Labels are set when the scan is created, so changing them replaces the scan.
 - `process_delay_hours` (Number) Hours to wait after a period closes before checking it, 0-24. Defaults to a value based on the frequency. Updated in place.
+- `severity` (String) Severity of every incident the scan opens: one of `P1`, `P2`, `P3`, `P4`, `P5`. A change applies to new incidents. Leave it out for no severity. Updated in place.
+- `type` (String) How Masthead evaluates the rows: `ANALYSIS` (the default; Masthead learns each metric's normal range) or `ANALYSIS_WITH_THRESHOLD` (each row sets its own limits in `lower_threshold` and `upper_threshold`; an empty one means no limit on that side). Changing it replaces the scan.
 
 ### Read-Only
 
 - `id` (String) Scan ID.
 - `project` (String) Project of the scan table.
 - `source` (String) Who set the scan up: `API` for scans created through the API, `MANUAL` for scans set up by Masthead.
-- `type` (String) How Masthead evaluates the rows, for example `ANALYSIS` (learned expected range).
 
 ## Import
 

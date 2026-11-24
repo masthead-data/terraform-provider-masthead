@@ -99,3 +99,49 @@ func TestUpdateDataScanSendsSetFields(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// A create sends the type, severity and labels; the response carries them back.
+func TestCreateDataScanSendsTypeSeverityLabels(t *testing.T) {
+	c := newScanTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		want := `{"table":"p.dq.orders","name":"Orders nulls","frequency":"DAILY","type":"ANALYSIS_WITH_THRESHOLD",` +
+			`"severity":"P2","labels":{"owner":"data-ops"}}`
+		if string(body) != want {
+			t.Errorf("body %s, want %s", body, want)
+		}
+		_, _ = w.Write([]byte(`{"summary":{"table":"p.dq.orders"},"scan":` +
+			strings.Replace(scanJSON, `"source":"API"`, `"source":"API","severity":"P2","labels":{"owner":"data-ops"}`, 1) + `}`))
+	})
+	threshold, severity := "ANALYSIS_WITH_THRESHOLD", "P2"
+	scan, _, err := c.CreateDataScan(DataScanCreateRequest{Table: "p.dq.orders", Name: "Orders nulls", Frequency: "DAILY",
+		Type: &threshold, Severity: &severity, Labels: map[string]string{"owner": "data-ops"}})
+	if err != nil || scan.Severity == nil || *scan.Severity != "P2" || scan.Labels["owner"] != "data-ops" {
+		t.Fatalf("create: %+v, %v", scan, err)
+	}
+}
+
+// A severity is left out of an update when unset, sent as null to remove it, and sent by name to change it.
+func TestUpdateDataScanSeverity(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		update DataScanUpdateRequest
+		want   string
+	}{
+		{"unchanged", DataScanUpdateRequest{}, `{}`},
+		{"removed", DataScanUpdateRequest{Severity: DataScanSeverityUpdate(nil)}, `{"severity":null}`},
+		{"changed", DataScanUpdateRequest{Severity: DataScanSeverityUpdate(func() *string { s := "P4"; return &s }())}, `{"severity":"P4"}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := newScanTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				body, _ := io.ReadAll(r.Body)
+				if string(body) != tc.want {
+					t.Errorf("body %s, want %s", body, tc.want)
+				}
+				_, _ = w.Write([]byte(`{"scan":` + scanJSON + `,"summary":null}`))
+			})
+			if _, err := c.UpdateDataScan(42, tc.update); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

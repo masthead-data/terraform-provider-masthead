@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	masthead "github.com/masthead-data/terraform-provider-masthead/internal/client"
 )
 
@@ -39,7 +40,9 @@ func (d *DataScanDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 			"process_delay_hours": schema.Int64Attribute{MarkdownDescription: "Hours after a period closes before it is checked.", Computed: true},
 			"active":              schema.BoolAttribute{MarkdownDescription: "Whether the scan runs.", Computed: true},
 			"project":             computed("Project of the scan table."),
-			"type":                computed("How Masthead evaluates the rows, for example `ANALYSIS`."),
+			"type":                computed("How Masthead evaluates the rows: `ANALYSIS` or `ANALYSIS_WITH_THRESHOLD`."),
+			"severity":            computed("Severity of the scan's incidents, `P1`-`P5`, or empty."),
+			"labels":              schema.MapAttribute{MarkdownDescription: "Key/value labels.", ElementType: types.StringType, Computed: true},
 			"source":              computed("`API` or `MANUAL` (set up by Masthead)."),
 		},
 	}

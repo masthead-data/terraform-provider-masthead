@@ -17,6 +17,13 @@ var DataScanFrequencies = map[string]int64{
 	"DAILY":          86400,
 }
 
+// DataScanTypes are how Masthead evaluates a scan's rows: ANALYSIS learns each metric's normal range,
+// ANALYSIS_WITH_THRESHOLD takes the limits from each row's lower_threshold / upper_threshold columns.
+var DataScanTypes = []string{"ANALYSIS", "ANALYSIS_WITH_THRESHOLD"}
+
+// DataScanSeverities are the severities a scan can give its incidents, as on Masthead incidents.
+var DataScanSeverities = []string{"P1", "P2", "P3", "P4", "P5"}
+
 // DataScanFrequencyName returns the API name of a period in seconds, or "" if there is none.
 func DataScanFrequencyName(seconds int64) string {
 	for name, s := range DataScanFrequencies {
@@ -29,20 +36,22 @@ func DataScanFrequencyName(seconds int64) string {
 
 // DataScan is a Masthead data scan: a BigQuery table of metric rows that Masthead checks every period.
 type DataScan struct {
-	ID                     int64      `json:"id"`
-	Name                   string     `json:"name"`
-	Description            *string    `json:"description"`
-	Project                string     `json:"project"`
-	Table                  *string    `json:"table"`
-	Type                   string     `json:"type"`
-	Frequency              int64      `json:"frequency"`
-	ProcessDelayHours      int64      `json:"processDelayHours"`
-	IsActive               bool       `json:"isActive"`
-	Source                 string     `json:"source"`
-	CreatedByType          *string    `json:"createdByType"`
-	CreatedAt              time.Time  `json:"createdAt"`
-	LastProcessedDatetime  *time.Time `json:"lastProcessedDatetime"`
-	NextProcessingDatetime *time.Time `json:"nextProcessingDatetime"`
+	ID                     int64             `json:"id"`
+	Name                   string            `json:"name"`
+	Description            *string           `json:"description"`
+	Project                string            `json:"project"`
+	Table                  *string           `json:"table"`
+	Type                   string            `json:"type"`
+	Frequency              int64             `json:"frequency"`
+	ProcessDelayHours      int64             `json:"processDelayHours"`
+	IsActive               bool              `json:"isActive"`
+	Source                 string            `json:"source"`
+	Severity               *string           `json:"severity"`
+	Labels                 map[string]string `json:"labels"`
+	CreatedByType          *string           `json:"createdByType"`
+	CreatedAt              time.Time         `json:"createdAt"`
+	LastProcessedDatetime  *time.Time        `json:"lastProcessedDatetime"`
+	NextProcessingDatetime *time.Time        `json:"nextProcessingDatetime"`
 }
 
 // DataScanSummary is what a create or a table change reads from the scan table: the dry-run result.
@@ -58,11 +67,14 @@ type DataScanSummary struct {
 
 // DataScanCreateRequest is the body of POST /clientApi/data-scans.
 type DataScanCreateRequest struct {
-	Table             string  `json:"table"`
-	Name              string  `json:"name"`
-	Frequency         string  `json:"frequency"`
-	ProcessDelayHours *int64  `json:"processDelayHours,omitempty"`
-	Description       *string `json:"description,omitempty"`
+	Table             string            `json:"table"`
+	Name              string            `json:"name"`
+	Frequency         string            `json:"frequency"`
+	ProcessDelayHours *int64            `json:"processDelayHours,omitempty"`
+	Description       *string           `json:"description,omitempty"`
+	Type              *string           `json:"type,omitempty"`
+	Severity          *string           `json:"severity,omitempty"`
+	Labels            map[string]string `json:"labels,omitempty"`
 }
 
 // DataScanUpdateRequest is the body of PATCH /clientApi/data-scans/{id}. Nil fields are left unchanged.
@@ -73,6 +85,18 @@ type DataScanUpdateRequest struct {
 	ProcessDelayHours *int64  `json:"processDelayHours,omitempty"`
 	Description       *string `json:"description,omitempty"`
 	Active            *bool   `json:"active,omitempty"`
+	// Severity is left out when nil; DataScanSeverityUpdate sets a new one or removes it.
+	Severity json.RawMessage `json:"severity,omitempty"`
+}
+
+// DataScanSeverityUpdate is the update value for a severity: the new severity, or JSON null to remove it.
+// The API keeps the severity when the field is missing, so a removal must send an explicit null.
+func DataScanSeverityUpdate(severity *string) json.RawMessage {
+	if severity == nil {
+		return json.RawMessage("null")
+	}
+	v, _ := json.Marshal(*severity)
+	return v
 }
 
 type dataScanWriteResponse struct {
