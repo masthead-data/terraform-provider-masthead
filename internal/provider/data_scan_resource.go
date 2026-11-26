@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -85,7 +84,7 @@ func (r *DataScanResource) Schema(ctx context.Context, req resource.SchemaReques
 		MarkdownDescription: "Manages a Masthead data scan: a BigQuery table of metric rows (`table_reference`, `rule_name`, " +
 			"`timestamp`, `value`) that Masthead checks for anomalies every period. Creating a scan first dry-runs it, " +
 			"so contract errors fail the apply before anything is created. Changing `name`, `table`, `schedule`, " +
-			"`schedule_timezone`, `frequency`, `type` or `labels` replaces the scan, which drops its history and incidents.",
+			"`schedule_timezone`, `frequency` or `type` replaces the scan, which drops its history and incidents.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "Scan ID.",
@@ -178,10 +177,9 @@ func (r *DataScanResource) Schema(ctx context.Context, req resource.SchemaReques
 			"labels": schema.MapAttribute{
 				MarkdownDescription: "Key/value labels, for example for ownership. Keys: up to 63 lowercase letters, digits, " +
 					"`_` and `-`, starting with a letter; values: up to 63 of the same characters. At most 64 labels. " +
-					"Labels are set when the scan is created, so changing them replaces the scan.",
-				ElementType:   types.StringType,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.RequiresReplace()},
+					"Updated in place: the scan keeps its history.",
+				ElementType: types.StringType,
+				Optional:    true,
 			},
 			"source": schema.StringAttribute{
 				MarkdownDescription: "Who set the scan up: `API` for scans created through the API, `MANUAL` for scans set up by Masthead.",
@@ -433,8 +431,7 @@ func (r *DataScanResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	// name, table, schedule, schedule_timezone, frequency, type and labels force replacement, so only these can
-	// change here.
+	// name, table, schedule, schedule_timezone, frequency and type force replacement, so only these can change here.
 	update := masthead.DataScanUpdateRequest{Active: plan.Active.ValueBoolPointer()}
 	if !plan.Description.Equal(state.Description) {
 		d := plan.Description.ValueString() // null config clears the description
@@ -445,6 +442,16 @@ func (r *DataScanResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 	if !plan.Severity.Equal(state.Severity) {
 		update.Severity = masthead.DataScanSeverityUpdate(plan.Severity.ValueStringPointer()) // null config removes it
+	}
+	if !plan.Labels.Equal(state.Labels) {
+		labels := map[string]string{} // null config removes them all
+		if !plan.Labels.IsNull() {
+			resp.Diagnostics.Append(plan.Labels.ElementsAs(ctx, &labels, false)...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+		}
+		update.Labels = &labels
 	}
 
 	scan, err := r.client.UpdateDataScan(id, update)

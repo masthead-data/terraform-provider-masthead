@@ -3,12 +3,12 @@
 page_title: "masthead_data_scan Resource - masthead"
 subcategory: ""
 description: |-
-  Manages a Masthead data scan: a BigQuery table of metric rows (table_reference, rule_name, timestamp, value) that Masthead checks for anomalies every period. Creating a scan first dry-runs it, so contract errors fail the apply before anything is created. Changing name, table, schedule, schedule_timezone, frequency, type or labels replaces the scan, which drops its history and incidents.
+  Manages a Masthead data scan: a BigQuery table of metric rows (table_reference, rule_name, timestamp, value) that Masthead checks for anomalies every period. Creating a scan first dry-runs it, so contract errors fail the apply before anything is created. Changing name, table, schedule, schedule_timezone, frequency or type replaces the scan, which drops its history and incidents.
 ---
 
 # masthead_data_scan (Resource)
 
-Manages a Masthead data scan: a BigQuery table of metric rows (`table_reference`, `rule_name`, `timestamp`, `value`) that Masthead checks for anomalies every period. Creating a scan first dry-runs it, so contract errors fail the apply before anything is created. Changing `name`, `table`, `schedule`, `schedule_timezone`, `frequency`, `type` or `labels` replaces the scan, which drops its history and incidents.
+Manages a Masthead data scan: a BigQuery table of metric rows (`table_reference`, `rule_name`, `timestamp`, `value`) that Masthead checks for anomalies every period. Creating a scan first dry-runs it, so contract errors fail the apply before anything is created. Changing `name`, `table`, `schedule`, `schedule_timezone`, `frequency` or `type` replaces the scan, which drops its history and incidents.
 
 ## Example Usage
 
@@ -61,7 +61,7 @@ resource "masthead_data_scan" "store_sales" {
 - `active` (Boolean) `false` pauses the scan. Defaults to `true`. Updated in place.
 - `description` (String) What the scan checks. Updated in place.
 - `frequency` (String) Shorthand for a UTC `schedule`: one of `HOURLY`, `EVERY_6_HOURS`, `EVERY_12_HOURS`, `DAILY` (`DAILY` is midnight UTC). Set this or `schedule`; read back as the frequency the schedule is the shorthand of, or empty for any other schedule. Changing it replaces the scan.
-- `labels` (Map of String) Key/value labels, for example for ownership. Keys: up to 63 lowercase letters, digits, `_` and `-`, starting with a letter; values: up to 63 of the same characters. At most 64 labels. Labels are set when the scan is created, so changing them replaces the scan.
+- `labels` (Map of String) Key/value labels, for example for ownership. Keys: up to 63 lowercase letters, digits, `_` and `-`, starting with a letter; values: up to 63 of the same characters. At most 64 labels. Updated in place: the scan keeps its history.
 - `process_delay_hours` (Number) Hours to wait after a period closes before checking it, 0-24. Defaults to a value based on the frequency. Updated in place.
 - `schedule` (String) When periods start and end: a five-field cron (minute hour day-of-month month day-of-week) or `@hourly`, `@daily`, `@weekly`, `@monthly`. Each period runs from one tick to the next and has one row per metric: `0 0 * * SUN-FRI` makes Friday's period Friday plus Saturday, `0 0 * * MON` is weekly, `0 0 1 * *` monthly, `0 4,6,15 * * *` three periods a day. Periods are 1 hour to 31 days. Set this or `frequency`; read back when `frequency` is set. Changing it replaces the scan.
 - `schedule_timezone` (String) IANA time zone the schedule runs in, for example `Europe/Paris`. Defaults to `UTC`. Changing it replaces the scan.

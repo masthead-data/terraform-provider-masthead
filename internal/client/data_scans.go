@@ -113,6 +113,8 @@ type DataScanUpdateRequest struct {
 	Active            *bool   `json:"active,omitempty"`
 	// Severity is left out when nil; DataScanSeverityUpdate sets a new one or removes it.
 	Severity json.RawMessage `json:"severity,omitempty"`
+	// Labels replaces all of the scan's labels and keeps its history; a pointer to an empty map removes them all.
+	Labels *map[string]string `json:"labels,omitempty"`
 }
 
 // DataScanSeverityUpdate is the update value for a severity: the new severity, or JSON null to remove it.

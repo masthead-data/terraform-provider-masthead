@@ -147,6 +147,32 @@ func TestUpdateDataScanSeverity(t *testing.T) {
 	}
 }
 
+// Labels are left out of an update when unset, sent as {} to remove them all, and sent in full to change them.
+func TestUpdateDataScanLabels(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		update DataScanUpdateRequest
+		want   string
+	}{
+		{"unchanged", DataScanUpdateRequest{}, `{}`},
+		{"removed", DataScanUpdateRequest{Labels: &map[string]string{}}, `{"labels":{}}`},
+		{"changed", DataScanUpdateRequest{Labels: &map[string]string{"owner": "data-ops"}}, `{"labels":{"owner":"data-ops"}}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := newScanTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				body, _ := io.ReadAll(r.Body)
+				if string(body) != tc.want {
+					t.Errorf("body %s, want %s", body, tc.want)
+				}
+				_, _ = w.Write([]byte(`{"scan":` + scanJSON + `,"summary":null}`))
+			})
+			if _, err := c.UpdateDataScan(42, tc.update); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 // A create with a schedule sends it with its zone and no frequency; the response carries the schedule back.
 func TestCreateDataScanSendsSchedule(t *testing.T) {
 	c := newScanTestClient(t, func(w http.ResponseWriter, r *http.Request) {
