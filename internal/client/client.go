@@ -95,10 +95,26 @@ func (c *Client) doRequest(req *http.Request) ([]byte, error) {
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return nil, formatAPIError(res.StatusCode, body)
+		return nil, &HTTPError{StatusCode: res.StatusCode, err: formatAPIError(res.StatusCode, body)}
 	}
 
 	return body, err
+}
+
+// HTTPError is a non-200 response. Its message is the formatted API error; StatusCode lets callers
+// tell a missing resource (404) from other failures.
+type HTTPError struct {
+	StatusCode int
+	err        error
+}
+
+func (e *HTTPError) Error() string { return e.err.Error() }
+func (e *HTTPError) Unwrap() error { return e.err }
+
+// IsNotFound reports whether err is a 404 response.
+func IsNotFound(err error) bool {
+	var httpErr *HTTPError
+	return errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound
 }
 
 // ErrEmptyValue indicates a 200 response whose value payload was null/empty —

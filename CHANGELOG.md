@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`masthead_data_scan` resource**: manages Masthead data scans through `/clientApi/data-scans`. A create dry-runs the scan first, so contract errors fail the apply before anything is created. `name`, `table`, `schedule`, `schedule_timezone`, `frequency` and `type` force replacement (the API resets history when they change); `description`, `process_delay_hours`, `active`, `severity` and `labels` update in place. The periods come from `schedule` (a five-field cron or `@daily` and the like, in `schedule_timezone`, default UTC) or `frequency`, its UTC shorthand: set one of them; both are read back. `type` is `ANALYSIS` (the default, a learned range) or `ANALYSIS_WITH_THRESHOLD` (limits from each row's `lower_threshold` / `upper_threshold`); `severity` is `P1`-`P5` and applies to new incidents. Import by scan ID.
+- **`masthead_data_scan` data source**: reads a data scan by `id` or by `name`.
+
 ### Changed
 
 ### Deprecated

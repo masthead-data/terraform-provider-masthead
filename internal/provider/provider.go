@@ -143,6 +143,7 @@ func (p *mastheadProvider) Resources(ctx context.Context) []func() resource.Reso
 		NewUserResource,
 		NewDataDomainResource,
 		NewDataProductResource,
+		NewDataScanResource,
 	}
 }
 
@@ -151,5 +152,6 @@ func (p *mastheadProvider) DataSources(ctx context.Context) []func() datasource.
 		NewUserDataSource,
 		NewDataDomainDataSource,
 		NewDataProductDataSource,
+		NewDataScanDataSource,
 	}
 }
